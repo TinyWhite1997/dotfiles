@@ -1,0 +1,5 @@
+- link:
+    ~/.config/:
+      glob: true
+      path: config/*
+      relink: true

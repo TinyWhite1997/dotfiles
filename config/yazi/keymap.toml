@@ -1,0 +1,5 @@
+[mgr]
+prepend_keymap = [
+{ on = "J", run = "arrow 5", desc = "Move down 5 lines" },
+{ on = "K", run = "arrow -5", desc = "Move up 5 lines" },
+]
