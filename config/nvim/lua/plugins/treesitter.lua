@@ -14,6 +14,7 @@ return {
       "html",
       "latex",
       "yaml",
+      "typescript",
       -- add more arguments for adding more treesitter parsers
     },
   },
