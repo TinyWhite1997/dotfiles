@@ -20,6 +20,10 @@ alias gp="git push"
 alias ga="git add"
 alias gb="git branch"
 alias gd="git diff"
-unalias gh
 
 alias lg="lazygit"
+
+# Conditionally unalias gh only if it is currently defined as an alias
+if alias gh >/dev/null 2>&1; then
+  unalias gh
+fi
