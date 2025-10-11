@@ -20,5 +20,6 @@ alias gp="git push"
 alias ga="git add"
 alias gb="git branch"
 alias gd="git diff"
+unalias gh
 
 alias lg="lazygit"
