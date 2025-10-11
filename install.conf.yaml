@@ -3,3 +3,4 @@
       glob: true
       path: config/*
       relink: true
+    ~/.alias.zsh:
