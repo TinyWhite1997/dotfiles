@@ -27,3 +27,11 @@ alias lg="lazygit"
 if alias gh >/dev/null 2>&1; then
   unalias gh
 fi
+
+export EDITOR="nvim"
+
+# If running inside WezTerm (WEZTERM_EXECUTABLE is set), provide a convenient
+# alias to change the current tab title: usage -> title "My Title"
+if [ -n "$WEZTERM_EXECUTABLE" ]; then
+  alias title='wezterm cli set-tab-title'
+fi
