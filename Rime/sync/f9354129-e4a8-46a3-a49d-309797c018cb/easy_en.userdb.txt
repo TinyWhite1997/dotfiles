@@ -1,0 +1,49 @@
+# Rime user dictionary
+#@/db_name	easy_en
+#@/db_type	userdb
+#@/rime_version	1.13.1
+#@/tick	34
+#@/user_id	f9354129-e4a8-46a3-a49d-309797c018cb
+achievement 	achievement	c=1 d=1 t=25
+already 	already	c=1 d=1 t=1
+announce 	announce	c=1 d=1 t=6
+audience 	audience	c=1 d=1 t=6
+branch 	branch	c=2 d=1.99501 t=10
+column 	column	c=1 d=1 t=27
+control 	control	c=1 d=1 t=15
+create 	create	c=1 d=1 t=14
+demo 	demo	c=1 d=1 t=16
+develop 	develop	c=1 d=1 t=4
+discuss 	discuss	c=1 d=1 t=26
+domain 	domain	c=2 d=1.99501 t=32
+environment 	environment	c=1 d=1 t=17
+filter 	filter	c=1 d=1 t=19
+handle 	handle	c=1 d=1 t=2
+ignore 	ignore	c=1 d=1 t=16
+inventory 	inventory	c=1 d=1 t=6
+issue 	issue	c=1 d=1 t=28
+list 	list	c=1 d=1 t=13
+made 	made	c=4 d=3.85371 t=12
+main 	main	c=1 d=1 t=23
+master 	master	c=1 d=1 t=29
+menu 	menu	c=1 d=1 t=19
+mouse 	mouse	c=1 d=1 t=9
+option 	option	c=1 d=1 t=17
+parent 	parent	c=2 d=1.99501 t=5
+previous 	previous	c=1 d=1 t=28
+purchase 	purchase	c=1 d=1 t=5
+regular 	regular	c=1 d=1 t=17
+release 	release	c=2 d=1.98511 t=33
+resource 	resource	c=1 d=1 t=14
+review 	review	c=2 d=1.93707 t=24
+richard 	richard	c=4 d=3.86917 t=22
+serialize 	serialize	c=2 d=1.99501 t=7
+service 	service	c=2 d=1.99005 t=20
+string 	string	c=1 d=1 t=8
+table 	table	c=2 d=1.96561 t=20
+test 	test	c=1 d=1 t=8
+topology 	topology	c=2 d=1.99501 t=12
+type 	type	c=2 d=1.99005 t=29
+ui 	UI	c=1 d=1 t=34
+windows 	Windows	c=1 d=1 t=10
+women 	women	c=2 d=1.99501 t=8

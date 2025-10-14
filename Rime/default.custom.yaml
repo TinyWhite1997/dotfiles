@@ -1,0 +1,26 @@
+customization:
+  distribution_code_name: Weasel
+  distribution_version: 0.17.4
+  generator: "Rime::SwitcherSettings"
+  modified_time: "Fri Aug 29 11:03:38 2025"
+  rime_version: 1.13.1
+patch:
+  "ascii_composer/good_old_caps_lock": true
+  "ascii_composer/switch_key":
+    Caps_Lock: commit_code
+    Control_L: noop
+    Control_R: noop
+    Shift_R: commit_code
+  "key_binder/bindings":
+    - { accept: Tab, send: "Shift+Right", when: composing }
+    - { accept: minus, send: Page_Up, when: paging }
+    - { accept: equal, send: Page_Down, when: has_menu }
+    - { accept: comma, send: Page_Up, when: paging }
+    - { accept: period, send: Page_Down, when: has_menu }
+    - { accept: bracketleft, send: Page_Up, when: paging }
+    - { accept: bracketright, send: Page_Down, when: has_menu }
+  "menu/page_size": 9
+  schema_list:
+    - { schema: double_pinyin_flypy }
+  switcher:
+    hotkeys: []

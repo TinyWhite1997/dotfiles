@@ -1,0 +1,9 @@
+2025/03/31-11:12:45.666000 17248 Log #20: 4 ops saved to Table #28 OK
+2025/03/31-11:12:45.666000 17248 Archiving C:\Users\weikaifu\OneDrive\Apps\Rime\easy_en.userdb/000020.log: OK
+2025/03/31-11:12:45.682000 17248 Table #5: 5 entries OK
+2025/03/31-11:12:45.682000 17248 Table #10: 10 entries OK
+2025/03/31-11:12:45.700000 17248 Table #18: 22 entries OK
+2025/03/31-11:12:45.713000 17248 Table #27: 20 entries OK
+2025/03/31-11:12:45.713000 17248 Table #28: 4 entries OK
+2025/03/31-11:12:45.719000 17248 Archiving C:\Users\weikaifu\OneDrive\Apps\Rime\easy_en.userdb/MANIFEST-000019: OK
+2025/03/31-11:12:45.726000 17248 **** Repaired leveldb C:\Users\weikaifu\OneDrive\Apps\Rime\easy_en.userdb; recovered 5 files; 2175 bytes. Some data may have been lost. ****
