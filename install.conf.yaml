@@ -4,3 +4,6 @@
       path: config/*
       relink: true
     ~/.config.zsh:
+    ~/Library/Rime:
+      path: Rime
+      relink: true
