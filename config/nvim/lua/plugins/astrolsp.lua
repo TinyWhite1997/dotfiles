@@ -24,6 +24,9 @@ return {
         },
         ignore_filetypes = { -- disable format on save for specified filetypes
           -- "python",
+          "json",
+          "yaml",
+          "markdown",
         },
       },
       disabled = { -- disable formatting capabilities for the listed language servers
