@@ -7,3 +7,9 @@
     ~/Library/Rime:
       path: Rime
       relink: true
+    ~/.zshrc:
+      path: zsh/zshrc
+      force: true
+    ~/.zimrc:
+      path: zsh/zimrc
+      force: true
