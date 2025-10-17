@@ -99,7 +99,7 @@ if sysname == "Darwin" then
   dll_path = "/Users/fuweikai/.roslyn/content/LanguageServer/osx-arm64/Microsoft.CodeAnalysis.LanguageServer.dll"
 elseif sysname == "Linux" then
   -- TODO: add Linux dll path
-  dll_path = ""
+  dll_path = "/home/weikai/.dotnet_lsp/content/LanguageServer/linux-x64/Microsoft.CodeAnalysis.LanguageServer.dll"
 elseif sysname == "Windows_NT" then
   -- TODO: add Windows dll path
   dll_path = ""

@@ -3,6 +3,7 @@
       glob: true
       path: config/*
       relink: true
+      create: true
     ~/.config.zsh:
     ~/Library/Rime:
       path: Rime
