@@ -1,0 +1,7 @@
+- link:
+    ~/AppData/Local/nvim:
+      path: config/nvim
+      relink: true
+    ~/AppData/Roaming/Rime:
+      path: Rime
+      relink: true
