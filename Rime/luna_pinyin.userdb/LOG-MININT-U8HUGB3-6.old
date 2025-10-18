@@ -1,8 +1,0 @@
-2025/06/11-11:31:58.504000 16128 Log #57: 6265 ops saved to Table #76 OK
-2025/06/11-11:31:58.507000 16128 Archiving C:\Users\weikaifu\OneDrive\Apps\Rime\luna_pinyin.userdb/000057.log: OK
-2025/06/11-11:31:58.509000 16128 Table #58: 1528 entries OK
-2025/06/11-11:31:58.511000 16128 Table #73: 2521 entries OK
-2025/06/11-11:31:58.514000 16128 Table #75: 3050 entries OK
-2025/06/11-11:31:58.514000 16128 Table #76: 6265 entries OK
-2025/06/11-11:31:58.522000 16128 Archiving C:\Users\weikaifu\OneDrive\Apps\Rime\luna_pinyin.userdb/MANIFEST-000055: OK
-2025/06/11-11:31:58.544000 16128 **** Repaired leveldb C:\Users\weikaifu\OneDrive\Apps\Rime\luna_pinyin.userdb; recovered 4 files; 409404 bytes. Some data may have been lost. ****

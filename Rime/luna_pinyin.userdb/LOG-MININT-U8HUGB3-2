@@ -1,4 +1,0 @@
-2025/03/31-11:12:45.604000 18008 Delete type=3 #1
-2025/04/01-11:25:14.332000 30428 Compacting 3@0 + 0@1 files
-2025/04/01-11:25:14.336000 30428 compacted to: files[ 3 0 0 0 0 0 0 ]
-2025/04/01-11:25:14.336000 30428 Compaction error: NotFound: C:\Users\weikaifu\OneDrive\Apps\Rime\luna_pinyin.userdb/000031.ldb: The system cannot find the file specified.
