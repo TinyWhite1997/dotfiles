@@ -2,6 +2,9 @@
     ~/AppData/Local/nvim:
       path: config/nvim
       relink: true
+    ~/AppData/Roaming/yazi/config:
+      path: config/yazi
+      relink: true
     ~/AppData/Roaming/Rime:
       path: Rime
       relink: true
