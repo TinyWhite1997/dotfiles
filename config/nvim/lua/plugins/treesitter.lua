@@ -1,21 +1,9 @@
-if true then return {} end -- WARN: REMOVE THIS LINE TO ACTIVATE THIS FILE
-
--- Customize Treesitter
-
 ---@type LazySpec
 return {
   "nvim-treesitter/nvim-treesitter",
-  opts = {
-    ensure_installed = {
-      "lua",
-      "vim",
-      "markdown",
-      "markdown_inline",
-      "html",
-      "latex",
-      "yaml",
-      "typescript",
-      -- add more arguments for adding more treesitter parsers
-    },
-  },
+  opts = function(_, opts)
+    -- `list_insert_unique` is in place, so it will modify
+    -- the first parameter table if provided
+    require("astrocore").list_insert_unique(opts.ensure_installed, { "html", "yaml", "typescript", "c_sharp" })
+  end,
 }

@@ -23,7 +23,7 @@ return {
   { import = "astrocommunity.pack.typescript" },
   { import = "astrocommunity.pack.ps1" },
   -- { import = "astrocommunity.pack.prettier" },
-  { import = "astrocommunity.recipes.picker-lsp-mappings" },
+  -- { import = "astrocommunity.recipes.picker-lsp-mappings" },
   { import = "astrocommunity.recipes.heirline-vscode-winbar" },
   -- import/override with your plugins folder
 }
