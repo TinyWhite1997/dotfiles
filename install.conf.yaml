@@ -4,13 +4,15 @@
       path: config/*
       relink: true
       create: true
-    ~/.config.zsh:
     ~/Library/Rime:
       path: Rime
       relink: true
+      if: '[ `uname` = Darwin ]'
     ~/.zshrc:
       path: zsh/zshrc
       force: true
     ~/.zimrc:
       path: zsh/zimrc
       force: true
+    ~/.config.zsh:
+      path: zsh/config.zsh
