@@ -8,11 +8,15 @@
       path: Rime
       relink: true
       if: '[ `uname` = Darwin ]'
+    ~/.zsh/:
+      glob: true
+      path: zsh/*
+      relink: true
+      create: true
+      exclude: [ zsh/zshrc, zsh/zimrc ]
     ~/.zshrc:
       path: zsh/zshrc
       force: true
     ~/.zimrc:
       path: zsh/zimrc
       force: true
-    ~/.config.zsh:
-      path: zsh/config.zsh
