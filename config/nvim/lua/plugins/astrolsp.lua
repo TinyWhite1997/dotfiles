@@ -80,8 +80,6 @@ return {
     -- mappings to be set up on attaching of a language server
     mappings = {
       n = {
-        ["gh"] = { vim.lsp.buf.hover, desc = "LSP Hover" },
-        ["F2"] = { vim.lsp.buf.rename, desc = "LSP Rename" },
         -- a `cond` key can provided as the string of a server capability to be required to attach, or a function with `client` and `bufnr` parameters from the `on_attach` that returns a boolean
         ["<Leader>uY"] = {
           function() require("astrolsp.toggles").buffer_semantic_tokens() end,
