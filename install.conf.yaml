@@ -20,3 +20,4 @@
     ~/.zimrc:
       path: zsh/zimrc
       force: true
+    ~/.hammerspoon:
