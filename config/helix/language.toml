@@ -1,0 +1,4 @@
+[[language]]
+name = "c-sharp"
+language-server = { command = "OmniSharp.exe" }
+debugger = { command = "netcoredbg" }
