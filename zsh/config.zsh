@@ -21,8 +21,13 @@ alias ga="git add"
 alias gb="git branch"
 alias gd="git diff"
 
-alias lg="lazygit"
-
+lg() {
+  if [[ $PWD == /mnt/c* ]]; then
+    lazygit.exe "$@"
+  else
+    lazygit "$@"
+  fi
+}
 # Conditionally unalias gh only if it is currently defined as an alias
 if alias gh >/dev/null 2>&1; then
   unalias gh
