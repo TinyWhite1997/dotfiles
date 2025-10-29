@@ -6,7 +6,7 @@ return {
   ---@diagnostic disable: missing-fields
   opts = {
     flavour = "mocha",
-    transparent_background = true,
+    transparent_background = not vim.g.neovide,
     float = {
       transparent = true,
       solid = false,
