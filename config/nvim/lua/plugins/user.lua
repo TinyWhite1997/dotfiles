@@ -82,43 +82,4 @@ return {
       )
     end,
   },
-  {
-    "loctvl842/monokai-pro.nvim",
-    config = function()
-      require("monokai-pro").setup {
-        transparent_background = not vim.g.neovide,
-        terminal_colors = not vim.g.neovide,
-        devicons = true,
-        styles = {
-          comment = { italic = true },
-          keyword = { italic = true }, -- any other keyword
-          type = { italic = true }, -- (preferred) int, long, char, etc
-          storageclass = { italic = true }, -- static, register, volatile, etc
-          structure = { italic = true }, -- struct, union, enum, etc
-          parameter = { italic = true }, -- parameter pass in function
-          annotation = { italic = true },
-          tag_attribute = { italic = true }, -- attribute of tag in reactjs
-        },
-        filter = "octagon", -- classic | octagon | pro | machine | ristretto | spectrum
-        inc_search = "background", -- underline | background
-        background_clear = {
-          "floaters", -- floaters | floats | none
-          "neo-tree",
-          "bufferline",
-        },
-        plugins = {
-          bufferline = {
-            underline_selected = true,
-            bold_selected = true,
-            italic_selected = true,
-          },
-          indent_blankline = {
-            context_highlight = "pro", -- default | pro
-            context_start_underline = true,
-          },
-        },
-      }
-      vim.cmd.colorscheme "monokai-pro"
-    end,
-  },
 }
