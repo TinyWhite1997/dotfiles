@@ -79,15 +79,13 @@ return {
 
         ["J"] = "5j",
         ["K"] = "5k",
-        ["H"] = "^",
+        ["H"] = "0",
         ["L"] = "$",
         -- tables with just a `desc` key will be registered with which-key if it's installed
         -- this is useful for naming menus
         ["<Leader><Leader>m"] = { desc = "Markdown" },
         ["<Leader><Leader>mo"] = { function() require("peek").open() end, desc = "Open preview window" },
         ["<Leader><Leader>mc"] = { function() require("peek").close() end, desc = "Close preview window" },
-        ["<Leader><Leader>w"] = { "<CMD>HopWord<CR>", desc = "Hop to word" },
-        ["<Leader><Leader>l"] = { "<CMD>HopLine<CR>", desc = "Hop to line" },
 
         ["<Leader>tr"] = { ":ToggleTermSetName<CR>", desc = "Rename terminal" },
         ["<Leader>tt"] = { ":TermSelect<CR>", desc = "Pick a terminal" },
@@ -96,7 +94,7 @@ return {
       v = {
         ["J"] = "5j",
         ["K"] = "5k",
-        ["H"] = "^",
+        ["H"] = "0",
         ["L"] = "$",
       },
       i = {
