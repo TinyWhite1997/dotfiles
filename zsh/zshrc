@@ -173,3 +173,10 @@ fi
 source ~/.zsh/config.zsh
 source ~/.zsh/fzf.zsh
 source ~/.zsh/fzf-git.sh
+
+# bun completions
+[ -s "/Users/fuweikai/.bun/_bun" ] && source "/Users/fuweikai/.bun/_bun"
+
+# bun
+export BUN_INSTALL="$HOME/.bun"
+export PATH="$BUN_INSTALL/bin:$PATH"

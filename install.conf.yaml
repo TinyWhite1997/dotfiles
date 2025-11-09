@@ -21,3 +21,5 @@
       path: zsh/zimrc
       force: true
     ~/.hammerspoon:
+      path: hammerspoon
+      relink: true
