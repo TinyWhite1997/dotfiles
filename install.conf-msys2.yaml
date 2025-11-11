@@ -1,0 +1,18 @@
+- link:
+    D:/.config/:
+      glob: true
+      path: config/*
+      relink: true
+      create: true
+    D:/.zsh/:
+      glob: true
+      path: zsh/*
+      relink: true
+      create: true
+      exclude: [ zsh/zshrc, zsh/zimrc ]
+    D:/.zshrc:
+      path: zsh/zshrc
+      force: true
+    D:/.zimrc:
+      path: zsh/zimrc
+      force: true
