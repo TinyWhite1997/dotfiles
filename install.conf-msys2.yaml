@@ -16,3 +16,8 @@
     D:/.zimrc:
       path: zsh/zimrc
       force: true
+    D:/.zsh/fzf-tab:
+      path: fzf-tab
+      relink: true
+- shell:
+  - [git submodule update --init --recursive, Installing submodules]

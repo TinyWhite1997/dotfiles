@@ -23,3 +23,8 @@
     ~/.hammerspoon:
       path: hammerspoon
       relink: true
+    ~/.zsh/fzf-tab:
+      path: fzf-tab
+      relink: true
+- shell:
+  - [git submodule update --init --recursive, Installing submodules]
