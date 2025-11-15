@@ -30,3 +30,5 @@
       path: ghostty-cursor-shaders
       relink: true
       create: true
+- shell:
+  - [git submodule update --init --recursive, Installing submodules]
