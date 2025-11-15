@@ -2,22 +2,22 @@ return {
   "folke/snacks.nvim",
   ---@type snacks.Config
   opts = {
-    explorer = {
-      replace_netrw = true,
-      trash = true,
-    },
+    -- explorer = {
+    --   replace_netrw = true,
+    --   trash = true,
+    -- },
   },
   keys = {
-    {
-      "<leader>e",
-      function() Snacks.explorer.open() end,
-      desc = "File Explorer",
-    },
-    {
-      "<leader>o",
-      function() Snacks.explorer.reveal() end,
-      desc = "Reveal in File Explorer",
-    },
+    -- {
+    --   "<leader>e",
+    --   function() Snacks.explorer.open() end,
+    --   desc = "File Explorer",
+    -- },
+    -- {
+    --   "<leader>o",
+    --   function() Snacks.explorer.reveal() end,
+    --   desc = "Reveal in File Explorer",
+    -- },
     -- Top Pickers & Explorer
     -- { "<leader><space>", function() Snacks.picker.smart() end, desc = "Smart Find Files" },
     -- { "<leader>,", function() Snacks.picker.buffers() end, desc = "Buffers" },

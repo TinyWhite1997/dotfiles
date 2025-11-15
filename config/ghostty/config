@@ -1,3 +1,7 @@
 theme = Catppuccin Frappe
 
 font-size = 17
+
+custom-shader = shaders/cursor_warp.glsl
+custom-shader = shaders/ripple_cursor.glsl
+

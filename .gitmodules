@@ -5,3 +5,6 @@
 [submodule "fzf-tab"]
 	path = fzf-tab
 	url = https://github.com/Aloxaf/fzf-tab.git
+[submodule "ghostty-cursor-shaders"]
+	path = ghostty-cursor-shaders
+	url = https://github.com/sahaj-b/ghostty-cursor-shaders

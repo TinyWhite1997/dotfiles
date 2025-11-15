@@ -26,5 +26,7 @@
     ~/.zsh/fzf-tab:
       path: fzf-tab
       relink: true
-- shell:
-  - [git submodule update --init --recursive, Installing submodules]
+    ~/.config/ghostty/shaders:
+      path: ghostty-cursor-shaders
+      relink: true
+      create: true
