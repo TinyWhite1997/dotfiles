@@ -35,7 +35,7 @@ hs.hotkey.bind({ "ctrl", "shift" }, "'", function()
 	-- Get current space
 	local currentSpace = hs.spaces.focusedSpace()
 	-- Get neovide app
-	local app = hs.application.get("kitty")
+	local app = hs.application.get("ghostty")
 	-- If app already open:
 	if app then
 		-- If no main window, then open a new window

@@ -5,3 +5,5 @@ font-size = 17
 custom-shader = shaders/cursor_warp.glsl
 custom-shader = shaders/ripple_cursor.glsl
 
+background-opacity = 0.85
+background-blur = true
