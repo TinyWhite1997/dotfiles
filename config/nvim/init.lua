@@ -114,6 +114,6 @@ else
   vim.api.nvim_set_keymap("v", "<C-v>", "<C-R>+", { noremap = true, silent = true })
 end
 
-vim.lsp.enable "roslyn_ls"
+vim.lsp.enable "roslyn"
 
 require "polish"
