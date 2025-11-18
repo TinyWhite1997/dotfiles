@@ -8,3 +8,6 @@
 [submodule "ghostty-cursor-shaders"]
 	path = ghostty-cursor-shaders
 	url = https://github.com/sahaj-b/ghostty-cursor-shaders
+[submodule "flavors"]
+	path = flavors
+	url = https://github.com/yazi-rs/flavors.git

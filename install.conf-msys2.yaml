@@ -19,5 +19,8 @@
     D:/.zsh/fzf-tab:
       path: fzf-tab
       relink: true
+    D:/.config/yazi/flavors:
+      path: flavors
+      relink: true
 - shell:
   - [git submodule update --init --recursive, Installing submodules]

@@ -77,11 +77,11 @@ if vim.g.neovide then
   vim.g.neovide_floating_z_height = 10
   vim.g.neovide_light_angle_degrees = 45
   vim.g.neovide_light_radius = 5
-  vim.g.neovide_opacity = 0.9
+  if sysname == "Darwin" then vim.g.neovide_opacity = 0.9 end
 
   vim.g.neovide_hide_mouse_when_typing = true
   vim.g.neovide_input_macos_option_key_is_meta = "only_left"
-  vim.g.neovide_input_ime = true
+  vim.g.neovide_input_ime = false
 
   vim.g.neovide_cursor_animate_in_insert_mode = true
   vim.g.neovide_cursor_animate_command_line = true

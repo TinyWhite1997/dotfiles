@@ -30,5 +30,8 @@
       path: ghostty-cursor-shaders
       relink: true
       create: true
+    ~/.config/yazi/flavors:
+      path: flavors
+      relink: true
 - shell:
   - [git submodule update --init --recursive, Installing submodules]
