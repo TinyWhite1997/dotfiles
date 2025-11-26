@@ -7,3 +7,9 @@ custom-shader = shaders/ripple_cursor.glsl
 
 background-opacity = 0.85
 background-blur = true
+
+keybind = shift+arrow_right=goto_split:right
+keybind = shift+arrow_left=goto_split:left
+keybind = shift+arrow_up=goto_split:up
+keybind = shift+arrow_down=goto_split:down
+
