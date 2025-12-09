@@ -8,6 +8,11 @@
       path: Rime
       relink: true
       if: '[ `uname` = Darwin ]'
+    ~/.local/share/fcitx5/rime:
+      path: Rime
+      relink: true
+      create: true
+      if: '[ `uname` = Linux ]'
     ~/.zsh/:
       glob: true
       path: zsh/*

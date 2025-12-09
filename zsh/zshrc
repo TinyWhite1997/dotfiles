@@ -168,6 +168,12 @@ if [[ "$(uname)" == "Darwin" ]]; then
 else 
   [ -s "/home/linuxbrew/.linuxbrew/opt/nvm/nvm.sh" ] && \. "/home/linuxbrew/.linuxbrew/opt/nvm/nvm.sh"  # This loads nvm
   [ -s "/home/linuxbrew/.linuxbrew/opt/nvm/etc/bash_completion.d/nvm" ] && \. "/home/linuxbrew/.linuxbrew/opt/nvm/etc/bash_completion.d/nvm"  # This loads nvm bash_completion
+  # 基于 GTK 的程序使用 fcitx5 作为输入法引擎
+  export GTK_IM_MODULE=fcitx5
+  # 基于 Qt 的程序使用 fcitx5 作为输入法引擎
+  export QT_IM_MODULE=fcitx5
+  # X系统层面的输入法设置,设置为 fcitx5,使所有 X 程序都使用 fcitx5
+  export XMODIFIERS=@im=fcitx5
 fi
 
 source ~/.zsh/config.zsh

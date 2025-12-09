@@ -1,11 +1,11 @@
-theme = Catppuccin Frappe
+theme = Catppuccin Mocha
 
 font-size = 17
 
 custom-shader = shaders/cursor_warp.glsl
 custom-shader = shaders/ripple_cursor.glsl
 
-background-opacity = 0.85
+background-opacity = 0.9
 background-blur = true
 
 keybind = shift+arrow_right=goto_split:right
@@ -13,3 +13,5 @@ keybind = shift+arrow_left=goto_split:left
 keybind = shift+arrow_up=goto_split:up
 keybind = shift+arrow_down=goto_split:down
 
+keybind = alt+shift+[=previous_tab
+keybind = alt+shift+]=next_tab
