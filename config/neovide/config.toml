@@ -1,6 +1,5 @@
 fork = true
 full = "buttonless"
-maximized = true
 title_hidden = true
 
 [font]

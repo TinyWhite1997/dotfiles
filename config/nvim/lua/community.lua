@@ -21,6 +21,7 @@ return {
   { import = "astrocommunity.pack.xml" },
   { import = "astrocommunity.pack.typescript" },
   { import = "astrocommunity.pack.ps1" },
+  { import = "astrocommunity.pack.tailwindcss" },
   -- { import = "astrocommunity.pack.prettier" },
   -- { import = "astrocommunity.recipes.picker-lsp-mappings" },
   { import = "astrocommunity.recipes.heirline-vscode-winbar" },
