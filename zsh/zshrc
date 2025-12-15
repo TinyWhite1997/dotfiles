@@ -135,10 +135,8 @@ HISTSIZE=1000
 SAVEHIST=1000
 setopt autocd notify
 unsetopt beep extendedglob
-# 
-if [[ "$(uname)" == "Linux" ]]; then
-  eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-fi
+
+[ -s "/home/linuxbrew/.linuxbrew/bin/brew" ] && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 
 eval "$(zoxide init zsh)"
 
@@ -162,18 +160,26 @@ export PATH=$PATH:$DOTNET_ROOT:$DOTNET_ROOT/tools:$HOME/.dotnet_lsp/content/Lang
 export PATH=$PATH:~/.local/kitty.app/bin
 export NVM_DIR="$HOME/.nvm"
 
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+[ -s "/home/linuxbrew/.linuxbrew/opt/nvm/nvm.sh" ] && \. "/home/linuxbrew/.linuxbrew/opt/nvm/nvm.sh"
+[ -s "/home/linuxbrew/.linuxbrew/opt/nvm/etc/bash_completion.d/nvm" ] && \. "/home/linuxbrew/.linuxbrew/opt/nvm/etc/bash_completion.d/nvm"
+[ -s "/usr/share/nvm/init-nvm.sh" ] && \. "/usr/share/nvm/init-nvm.sh"
+
 if [[ "$(uname)" == "Darwin" ]]; then
-  [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
-  [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 else 
-  [ -s "/home/linuxbrew/.linuxbrew/opt/nvm/nvm.sh" ] && \. "/home/linuxbrew/.linuxbrew/opt/nvm/nvm.sh"  # This loads nvm
-  [ -s "/home/linuxbrew/.linuxbrew/opt/nvm/etc/bash_completion.d/nvm" ] && \. "/home/linuxbrew/.linuxbrew/opt/nvm/etc/bash_completion.d/nvm"  # This loads nvm bash_completion
   # 基于 GTK 的程序使用 fcitx5 作为输入法引擎
   export GTK_IM_MODULE=fcitx5
   # 基于 Qt 的程序使用 fcitx5 作为输入法引擎
   export QT_IM_MODULE=fcitx5
   # X系统层面的输入法设置,设置为 fcitx5,使所有 X 程序都使用 fcitx5
   export XMODIFIERS=@im=fcitx5
+
+  # WSL
+  if grep -qi microsoft /proc/version; then
+    export GALLIUM_DRIVER=d3d12
+    export LIBVA_DRIVER_NAME=d3d12
+  fi
 fi
 
 source ~/.zsh/config.zsh
