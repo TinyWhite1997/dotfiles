@@ -67,6 +67,7 @@ return {
 
         ["<C-d>"] = "<C-d>",
 
+        ["<leader>la"] = { function() vim.lsp.buf.code_action() end, desc = "Code Actions" },
         -- mappings seen under group name "Buffer"
         ["<Leader>bd"] = {
           function()

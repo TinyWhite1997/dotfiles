@@ -193,3 +193,4 @@ source ~/.zsh/fzf-git.sh
 export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
 source ~/.zsh/fzf-tab/fzf-tab.plugin.zsh
+export PATH="$HOME/.local/bin:$PATH"

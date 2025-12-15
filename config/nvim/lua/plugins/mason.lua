@@ -16,7 +16,7 @@ return {
         "debugpy",
         "tree-sitter-cli",
         "powershell-editor-services",
-        "vtsls",
+        -- "vtsls",
         -- "deno",
         "postgrestools",
         "pgformatter",
