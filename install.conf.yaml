@@ -4,6 +4,11 @@
       path: config/*
       relink: true
       create: true
+      exclude: [ config/niri ]
+    ~/.config/niri/config.kdl:
+      path: config/niri/config.kdl
+      relink: true
+      create: true
     ~/Library/Rime:
       path: Rime
       relink: true

@@ -1,6 +1,6 @@
 theme = Catppuccin Mocha
 
-font-size = 17
+font-size = 15
 
 custom-shader = shaders/cursor_warp.glsl
 custom-shader = shaders/ripple_cursor.glsl

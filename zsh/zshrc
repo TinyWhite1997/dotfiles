@@ -182,6 +182,14 @@ else
   fi
 fi
 
+# clashctl
+if [ -s /home/weikai/clashctl/scripts/cmd/clashctl.sh1 ]; then 
+  # 加载 clashctl 命令
+  . /home/weikai/clashctl/scripts/cmd/clashctl.sh
+  # 自动开启代理环境
+  watch_proxy
+fi
+
 source ~/.zsh/config.zsh
 source ~/.zsh/fzf.zsh
 source ~/.zsh/fzf-git.sh
