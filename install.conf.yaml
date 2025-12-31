@@ -43,5 +43,9 @@
     ~/.config/yazi/flavors:
       path: flavors
       relink: true
+    /etc/keyd/default.conf:
+      path: keyd/default.conf
+      relink: true
+      create: true
 - shell:
   - [git submodule update --init --recursive, Installing submodules]
