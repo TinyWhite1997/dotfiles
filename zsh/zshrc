@@ -195,6 +195,14 @@ export PATH="$BUN_INSTALL/bin:$PATH"
 source ~/.zsh/fzf-tab/fzf-tab.plugin.zsh
 export PATH="$HOME/.local/bin:$PATH"
 
+# pnpm
+export PNPM_HOME="/home/weikai/.local/share/pnpm"
+case ":$PATH:" in
+  *":$PNPM_HOME:"*) ;;
+  *) export PATH="$PNPM_HOME:$PATH" ;;
+esac
+
+# pnpm end
 if [[ $SSH_CONNECTION ]]; then
   export TERM=xterm-256color
 fi
