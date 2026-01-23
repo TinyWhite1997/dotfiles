@@ -11,3 +11,6 @@
 [submodule "flavors"]
 	path = flavors
 	url = https://github.com/yazi-rs/flavors.git
+[submodule "zsh/fzf-tab"]
+	path = zsh/fzf-tab
+	url = https://github.com/Aloxaf/fzf-tab.git
