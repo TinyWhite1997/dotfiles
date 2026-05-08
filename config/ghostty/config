@@ -8,6 +8,7 @@ custom-shader = shaders/ripple_cursor.glsl
 
 background-opacity = 0.9
 background-blur = true
+gtk-titlebar = false
 
 keybind = shift+arrow_right=goto_split:right
 keybind = shift+arrow_left=goto_split:left

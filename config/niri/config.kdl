@@ -70,6 +70,7 @@ input {
 }
 
 include "outputs.kdl"
+include "local.kdl"
 
 // Settings that influence how windows are positioned and sized.
 // Find more information on the wiki:
@@ -339,7 +340,7 @@ cursor {
 }
 
 overview {
-    zoom 0.6
+    zoom 0.4
 }
 
 binds {
@@ -356,6 +357,8 @@ binds {
     // Mod-Shift-/, which is usually the same as Mod-?,
     // shows a list of important hotkeys.
     Mod+Shift+Slash { show-hotkey-overlay; }
+
+    F8 { spawn "sh" "-c" "~/bin/dictate-toggle.sh"; }
 
     // Suggested binds for running programs: terminal, app launcher, screen locker.
     Mod+T hotkey-overlay-title="Open a Terminal: ghostty" { spawn "ghostty"; }
@@ -469,6 +472,10 @@ binds {
     Mod+Shift+Page_Up   { move-workspace-up; }
     Mod+Shift+U         { move-workspace-down; }
     Mod+Shift+I         { move-workspace-up; }
+    Mod+Ctrl+Shift+U         { move-workspace-down; }
+    Mod+Ctrl+Shift+I         { move-workspace-up; }
+    Mod+Ctrl+Shift+Y         { move-workspace-to-monitor-left; }
+    Mod+Ctrl+Shift+O         { move-workspace-to-monitor-right; }
 
     // You can bind mouse wheel scroll ticks using the following syntax.
     // These binds will change direction based on the natural-scroll setting.
