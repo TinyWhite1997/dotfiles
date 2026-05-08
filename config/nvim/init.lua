@@ -3,7 +3,6 @@
 local lazypath = vim.env.LAZY or vim.fn.stdpath "data" .. "/lazy/lazy.nvim"
 
 vim.lsp.enable "roslyn"
-vim.lsp.enable "vtsls"
 
 if not (vim.env.LAZY or (vim.uv or vim.loop).fs_stat(lazypath)) then
   -- stylua: ignore

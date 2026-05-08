@@ -207,4 +207,16 @@ esac
 if [[ $SSH_CONNECTION ]]; then
   export TERM=xterm-256color
   export LANG=en_US.UTF-8
+  export COLORTERM=truecolor
 fi
+eval 
+EAS_AC_ZSH_SETUP_PATH=/Users/fuweikai/Library/Caches/eas-cli/autocomplete/zsh_setup && test -f $EAS_AC_ZSH_SETUP_PATH && source $EAS_AC_ZSH_SETUP_PATH; # eas autocomplete setup
+# Google Cloud SDK
+if [ -f "$HOME/google-cloud-sdk/path.zsh.inc" ]; then . "$HOME/google-cloud-sdk/path.zsh.inc"; fi
+if [ -f "$HOME/google-cloud-sdk/completion.zsh.inc" ]; then . "$HOME/google-cloud-sdk/completion.zsh.inc"; fi
+
+# Local configuration
+[ -s "$HOME/.zsh/local.zsh" ] && source "$HOME/.zsh/local.zsh"
+
+# sentry
+fpath=("/Users/fuweikai/.local/share/zsh/site-functions" $fpath)
