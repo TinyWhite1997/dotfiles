@@ -45,6 +45,10 @@
       path: copilot/copilot-instructions.md
       relink: true
       create: true
+    ~/.paseo/config.json:
+      path: paseo/config.json
+      force: true
+      create: true
     ~/.zsh/fzf-tab:
       path: fzf-tab
       relink: true

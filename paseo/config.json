@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "daemon": {
+    "listen": "127.0.0.1:6767",
+    "cors": {
+      "allowedOrigins": [
+        "https://app.paseo.sh"
+      ]
+    },
+    "relay": {
+      "enabled": true,
+      "endpoint": "paseo.fuweikai.top:443",
+      "publicEndpoint": "paseo.fuweikai.top:443",
+      "useTls": true
+    }
+  },
+  "app": {
+    "baseUrl": "https://app.paseo.sh"
+  }
+}
