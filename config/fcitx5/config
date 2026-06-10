@@ -1,0 +1,3 @@
+[Behavior]
+# Start with the default input method active instead of keyboard-us.
+ActiveByDefault=True

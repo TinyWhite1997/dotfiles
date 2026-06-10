@@ -16,6 +16,10 @@
     D:/.zimrc:
       path: zsh/zimrc
       force: true
+    D:/.copilot/copilot-instructions.md:
+      path: copilot/copilot-instructions.md
+      relink: true
+      create: true
     D:/.zsh/fzf-tab:
       path: fzf-tab
       relink: true

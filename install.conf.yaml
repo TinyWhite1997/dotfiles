@@ -4,9 +4,17 @@
       path: config/*
       relink: true
       create: true
-      exclude: [ config/niri ]
+      exclude: [ config/niri, config/fcitx5 ]
     ~/.config/niri/config.kdl:
       path: config/niri/config.kdl
+      relink: true
+      create: true
+    ~/.config/fcitx5/profile:
+      path: config/fcitx5/profile
+      relink: true
+      create: true
+    ~/.config/fcitx5/config:
+      path: config/fcitx5/config
       relink: true
       create: true
     ~/Library/Rime:
@@ -33,6 +41,10 @@
     ~/.hammerspoon:
       path: hammerspoon
       relink: true
+    ~/.copilot/copilot-instructions.md:
+      path: copilot/copilot-instructions.md
+      relink: true
+      create: true
     ~/.zsh/fzf-tab:
       path: fzf-tab
       relink: true

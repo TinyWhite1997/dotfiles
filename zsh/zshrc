@@ -212,8 +212,6 @@ if [ -f "$HOME/google-cloud-sdk/completion.zsh.inc" ]; then . "$HOME/google-clou
 # cargo
 [ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
 
-# opencode
-export PATH=/home/weikai/.opencode/bin:$PATH
 
 # Local configuration
 [ -s "$HOME/.zsh/local.zsh" ] && source "$HOME/.zsh/local.zsh"
