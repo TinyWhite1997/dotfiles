@@ -18,7 +18,6 @@ return {
         "powershell-editor-services",
         -- "vtsls",
         -- "deno",
-        "postgrestools",
         "pgformatter",
       },
     },
