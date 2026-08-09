@@ -20,6 +20,11 @@
       path: copilot/copilot-instructions.md
       relink: true
       create: true
+    D:/.pi/agent/extensions/:
+      glob: true
+      path: pi/agent/extensions/*
+      force: true
+      create: true
     D:/.zsh/fzf-tab:
       path: fzf-tab
       relink: true
