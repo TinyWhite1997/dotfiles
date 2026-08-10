@@ -7,6 +7,7 @@ This directory contains the Pi extensions managed by Dotbot.
 - `agency-hub.ts`
 - `claude-statusline.ts`
 - `copilot-web-search.ts`
+- `lazygit.ts` (`/lazygit` temporarily opens lazygit in the current directory, then returns to the same Pi session)
 
 The install configurations link each file into Pi's global extension directory instead of replacing the whole directory, so machine-local extensions with other names can coexist with the managed files. Existing files with the managed names are replaced during installation.
 
