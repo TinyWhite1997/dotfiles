@@ -6,12 +6,17 @@
  */
 
 import { spawnSync } from "node:child_process";
+import { closeSync, openSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 interface LazygitResult {
 	status: number | null;
 	signal: NodeJS.Signals | null;
 	error?: string;
+	stderr?: string;
+	logPath?: string;
 }
 
 const EMPTY_COMPONENT = { render: () => [], invalidate: () => {} };
@@ -27,30 +32,59 @@ export default function (pi: ExtensionAPI) {
 
 			await ctx.waitForIdle();
 
-			const result = await ctx.ui.custom<LazygitResult>((tui, _theme, _keybindings, done) => {
-				let runResult: LazygitResult = { status: null, signal: null };
+			// Pi may retain an MSYS path such as /home/user/project in ctx.cwd,
+			// which a native Windows executable cannot chdir to. Node's cwd is the
+			// corresponding native path (for example C:\\msys64\\home\\...).
+			const launchCwd = process.platform === "win32" ? process.cwd() : ctx.cwd;
+			const launchEnv = { ...process.env };
+			if (process.platform === "win32") {
+				// Pi was launched from MSYS2, whose /usr/bin/git can report POSIX
+				// worktree paths to native lazygit. Force Git for Windows instead.
+				const windowsGitDir = join(process.env.ProgramFiles ?? "C:\\Program Files", "Git", "cmd");
+				launchEnv.PATH = `${windowsGitDir};${process.env.PATH ?? ""}`;
+				launchEnv.PWD = launchCwd;
+			}
 
+			const result = await ctx.ui.custom<LazygitResult>((tui, _theme, _keybindings, done) => {
 				tui.stop();
 				process.stdout.write("\x1b[2J\x1b[H");
 
-				try {
-					const child = spawnSync(process.platform === "win32" ? "lazygit.exe" : "lazygit", [], {
-						cwd: ctx.cwd,
-						stdio: "inherit",
-						env: process.env,
-					});
-					runResult = {
-						status: child.status,
-						signal: child.signal,
-						error: child.error?.message,
-					};
-				} catch (error) {
-					runResult.error = error instanceof Error ? error.message : String(error);
-				} finally {
-					tui.start();
-					tui.requestRender(true);
-					done(runResult);
-				}
+				// Defer the spawn so Node has a chance to finish cancelling Pi's
+				// pending console read after tui.stop(). Starting lazygit in this same
+				// call stack can leave two readers racing on Windows console input.
+				setTimeout(() => {
+					let runResult: LazygitResult = { status: null, signal: null };
+					const stderrPath = join(tmpdir(), `pi-lazygit-${process.pid}.log`);
+					let stderrFd: number | undefined;
+					try {
+						stderrFd = openSync(stderrPath, "w");
+						const child = spawnSync(
+							process.platform === "win32" ? "lazygit.exe" : "lazygit",
+							process.platform === "win32" ? ["--path", launchCwd] : [],
+							{
+								cwd: launchCwd,
+								stdio: ["inherit", "inherit", stderrFd],
+								env: launchEnv,
+							},
+						);
+						closeSync(stderrFd);
+						stderrFd = undefined;
+						runResult = {
+							status: child.status,
+							signal: child.signal,
+							error: child.error?.message,
+							stderr: readFileSync(stderrPath, "utf8").trim(),
+							logPath: stderrPath,
+						};
+					} catch (error) {
+						runResult.error = error instanceof Error ? error.message : String(error);
+					} finally {
+						if (stderrFd !== undefined) closeSync(stderrFd);
+						tui.start();
+						tui.requestRender(true);
+						done(runResult);
+					}
+				}, process.platform === "win32" ? 100 : 0);
 
 				return EMPTY_COMPONENT;
 			});
@@ -60,7 +94,12 @@ export default function (pi: ExtensionAPI) {
 			} else if (result.signal) {
 				ctx.ui.notify(`lazygit exited after signal ${result.signal}`, "warning");
 			} else if (result.status !== 0) {
-				ctx.ui.notify(`lazygit exited with code ${result.status ?? "unknown"}`, "warning");
+				const detail = result.stderr ? `: ${result.stderr.slice(-1500)}` : "";
+				const log = result.logPath ? ` (log: ${result.logPath})` : "";
+				ctx.ui.notify(
+					`lazygit exited with code ${result.status ?? "unknown"}${detail}${log} (cwd: ${launchCwd})`,
+					"warning",
+				);
 			}
 		},
 	});
