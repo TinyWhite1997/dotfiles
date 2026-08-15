@@ -17,3 +17,5 @@
       path: pi/agent/extensions/*
       force: true
       create: true
+- shell:
+  - [npm install --prefix "%USERPROFILE%/.pi/agent/extensions", Installing Pi extension dependencies]

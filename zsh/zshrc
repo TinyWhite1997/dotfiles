@@ -218,3 +218,8 @@ if [ -f "$HOME/google-cloud-sdk/completion.zsh.inc" ]; then . "$HOME/google-clou
 
 # sentry
 fpath=("/Users/fuweikai/.local/share/zsh/site-functions" $fpath)
+
+# Pi
+export PATH="/home/weikai/.local/share/pi-node/node-v22.23.2-linux-x64/bin:$PATH"
+
+if command -v wt >/dev/null 2>&1; then eval "$(command wt config shell init zsh)"; fi

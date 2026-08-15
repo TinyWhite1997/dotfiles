@@ -70,3 +70,4 @@
       create: true
 - shell:
   - [git submodule update --init --recursive, Installing submodules]
+  - [npm install --prefix "$HOME/.pi/agent/extensions", Installing Pi extension dependencies]
