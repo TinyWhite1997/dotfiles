@@ -3,9 +3,11 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@modelcontextprotocol/sdk": "1.30.0",
     "defuddle": "^0.19.2",
     "ipaddr.js": "^2.5.0",
     "linkedom": "^0.18.13",
+    "mcp-remote": "0.1.38",
     "undici": "^8.10.0"
   }
 }
