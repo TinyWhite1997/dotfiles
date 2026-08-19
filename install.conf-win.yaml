@@ -18,4 +18,5 @@
       force: true
       create: true
 - shell:
+  - [git submodule update --init --recursive, Installing submodules]
   - [npm install --prefix "%USERPROFILE%/.pi/agent/extensions", Installing Pi extension dependencies]
