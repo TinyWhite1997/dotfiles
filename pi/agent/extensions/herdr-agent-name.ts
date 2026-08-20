@@ -2,8 +2,8 @@
  * herdr-agent-name — name the current Herdr agent from the first prompt.
  *
  * The extension asks github-copilot/gpt-5.6-luna for a short slug, checks all
- * live Herdr agent names, and renames the agent in the current pane. Herdr
- * remains the final authority for name validation and uniqueness.
+ * live Herdr agent names, then gives the current agent and tab the same name.
+ * Herdr remains the final authority for name validation and uniqueness.
  *
  * Optional environment variables:
  *   PI_HERDR_NAMING_MODEL     Model id (default: gpt-5.6-luna)
@@ -92,11 +92,12 @@ export default function (pi: ExtensionAPI) {
 
   const inHerdr = process.env.HERDR_ENV === "1";
   const paneId = process.env.HERDR_PANE_ID;
+  const tabId = process.env.HERDR_TAB_ID;
   let shouldNameOnNextPrompt = false;
   let namingController: AbortController | undefined;
 
   pi.on("session_start", (_event, ctx) => {
-    shouldNameOnNextPrompt = inHerdr && Boolean(paneId) && !hasUserPrompt(ctx);
+    shouldNameOnNextPrompt = inHerdr && Boolean(paneId) && Boolean(tabId) && !hasUserPrompt(ctx);
   });
 
   pi.on("session_shutdown", () => {
@@ -105,7 +106,7 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("before_agent_start", (event, ctx) => {
-    if (!shouldNameOnNextPrompt || !paneId) return;
+    if (!shouldNameOnNextPrompt || !paneId || !tabId) return;
 
     // Claim the first prompt synchronously, but do the network request in the
     // background so naming never delays the actual agent response.
@@ -229,7 +230,15 @@ export default function (pi: ExtensionAPI) {
           );
 
           if (renameResult.code === 0) {
-            ctx.ui.notify(`Herdr agent renamed to ${candidate}`, "info");
+            const tabRenameResult = await pi.exec(
+              "herdr",
+              ["tab", "rename", tabId, candidate],
+              { signal: controller.signal, timeout: 10_000 },
+            );
+            if (tabRenameResult.code !== 0) {
+              throw new Error(tabRenameResult.stderr.trim() || "herdr tab rename failed");
+            }
+            ctx.ui.notify(`Herdr agent and tab renamed to ${candidate}`, "info");
             return;
           }
           lastError = renameResult.stderr.trim() || renameResult.stdout.trim();
