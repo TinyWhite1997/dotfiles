@@ -9,3 +9,4 @@ config/yazi/flavors
 Rime/sync/3186fe33-7c60-437d-82af-2395753dd208
 Rime/sync/f2c0d803-e7b4-4b59-82ac-b09ee787e3cf
 pi/agent/extensions/node_modules/
+/.pi-subagents/artifacts
