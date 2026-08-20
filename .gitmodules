@@ -7,7 +7,8 @@
 	url = https://github.com/Aloxaf/fzf-tab.git
 [submodule "ghostty-cursor-shaders"]
 	path = ghostty-cursor-shaders
-	url = https://github.com/sahaj-b/ghostty-cursor-shaders
+	url = https://github.com/TinyWhite1997/ghostty-cursor-shaders.git
+	branch = dotfiles
 [submodule "flavors"]
 	path = flavors
 	url = https://github.com/yazi-rs/flavors.git

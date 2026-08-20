@@ -57,10 +57,6 @@
     ~/.zsh/fzf-tab:
       path: fzf-tab
       relink: true
-    ~/.config/ghostty/shaders:
-      path: ghostty-cursor-shaders
-      relink: true
-      create: true
     ~/.config/yazi/flavors:
       path: flavors
       relink: true
