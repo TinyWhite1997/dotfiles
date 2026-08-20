@@ -12,9 +12,6 @@
 [submodule "flavors"]
 	path = flavors
 	url = https://github.com/yazi-rs/flavors.git
-[submodule "zsh/fzf-tab"]
-	path = zsh/fzf-tab
-	url = https://github.com/Aloxaf/fzf-tab.git
 [submodule "pi/agent/extensions/amplitude/mcp-marketplace"]
 	path = pi/agent/extensions/amplitude/mcp-marketplace
 	url = https://github.com/amplitude/mcp-marketplace.git
