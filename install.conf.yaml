@@ -64,6 +64,7 @@
       path: keyd/default.conf
       relink: true
       create: true
+      if: '[ `uname` = Linux ]'
 - shell:
   - [git submodule sync --recursive && git submodule update --init --recursive, Installing submodules]
   - [npm install --prefix "$HOME/.pi/agent/extensions", Installing Pi extension dependencies]
