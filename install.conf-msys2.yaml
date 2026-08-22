@@ -34,3 +34,5 @@
 - shell:
   - [git submodule update --init --recursive, Installing submodules]
   - [npm install --prefix D:/.pi/agent/extensions, Installing Pi extension dependencies]
+  - [./pi/install-packages.sh, Installing Pi packages]
+  - [ln -sfn ../../pi/git-pre-commit .git/hooks/pre-commit, Installing Pi packages git hook]

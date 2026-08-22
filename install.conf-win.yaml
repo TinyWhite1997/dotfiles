@@ -20,3 +20,5 @@
 - shell:
   - [git submodule update --init --recursive, Installing submodules]
   - [npm install --prefix "%USERPROFILE%/.pi/agent/extensions", Installing Pi extension dependencies]
+  - [powershell -NoProfile -File pi/install-packages.ps1, Installing Pi packages]
+  - [ln -sfn ../../pi/git-pre-commit .git/hooks/pre-commit, Installing Pi packages git hook]

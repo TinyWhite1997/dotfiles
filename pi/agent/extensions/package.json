@@ -2,6 +2,9 @@
   "name": "weikai-pi-extensions",
   "private": true,
   "type": "module",
+  "scripts": {
+    "test": "pi -e ./yazi.ts --list-models"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.30.0",
     "defuddle": "^0.19.2",
