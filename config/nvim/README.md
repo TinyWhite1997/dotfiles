@@ -1,68 +1,34 @@
-### Create expo project
+# Neovim configuration
 
-1. ts app config
-2. setup different bundle id for dev and production
+Standalone Neovim 0.12+ configuration. It keeps selected AstroNvim behavior without loading AstroNvim or AstroCommunity.
 
-### Setup EAS
+Configuration precedence is:
 
-1. eas config
-2. eas build
-3. setup eas env: https://docs.expo.dev/eas/environment-variables/
+1. plugin defaults (inside each plugin),
+2. locally copied/adapted AstroNvim presets,
+3. this repository's local overrides.
 
-### Create firebase project
+The latter wins when tables are merged.
 
-1. Setup android/ios app
-2. download configuration
-3. setup app config
-4. install packages and add plugin settings
-5. Setup Apple sign in: [Apple Sign In
-   ](https://firebase.google.com/docs/auth/ios/apple?hl=zh-CN&authuser=0&_gl=1*18ofzwd*_ga*MjE0NDIzOTIzNS4xNzQwNDAxOTM3*_ga_CW55HF8NVT*czE3NDkyOTQ0NzYkbzg1JGcxJHQxNzQ5Mjk1Mjc3JGo1NSRsMCRoMA)
-6. Setup Google sign in:
-   1. SHA1 Key: cd android && ./gradlew signingReport
-   2. Re-download firebase config file
-   3. https://rnfirebase.io/auth/social-auth#google
-7. **Customize email content**
+## Run
 
-### Setup Apple Connect
-
-1. Create new app
-2. Setup Subscription (submit screenshot)
-3. Setup industry and discount
-
-### Create Revenue cat project
-
-1. Setup product
-2. Setup offering and entitlement
-3. Setup Paywall
-4. Setup firebase hook (analysis & purchase)
-5. Initialize in code
-
-# Tips
-
-##### expo run ios with ios folder removed:
-
-open clash with global mode
-
-##### List simulators
-
-xcrun simctl list devices
-
-###### List physical machines
-
-xcrun devicectl list devices
-
-##### Download simulators
-
-xcodebuild -downloadAllPlatforms
-
-##### Select installed xcode version
-
-```zsh
-sudo xcode-select -s /Users/fuweikai/Downloads/Xcode.app/Contents/Developer
+```sh
+nvim
 ```
 
-# Issues
+On Linux/macOS, `install.conf.yaml` links `config/nvim` to `~/.config/nvim`. On Windows, `install.conf-win.yaml` links it to `~/AppData/Local/nvim`.
 
-##### DVTDeviceOperation: Encountered a build number "" that is incompatible with DVTBuildVersion.
+## Design
 
-##### AI SDK polyfill needed
+- 29 locked plugins; no AstroNvim/AstroCommunity runtime dependency.
+- Yazi remains the file browser. Snacks Explorer is intentionally not enabled.
+- Snacks provides picker, Lazygit, terminal, dashboard, notifier, and UI selection.
+- LSP uses `vim.lsp.config()`, `vim.lsp.enable()`, native completion, native snippets, CodeLens, inlay hints, semantic tokens, and document highlights.
+- `nvim-lspconfig` only supplies server definitions; Mason installs server executables.
+- Formatting uses Conform with Prettier/Prettierd, StyLua, and pgFormatter.
+- AstroNvim-style LSP mappings are retained, with the existing local Snacks mappings taking priority.
+- Heirline provides an Astro-like statusline/tabline and VS Code-style path winbar.
+
+Configured LSP servers: LuaLS, vtsls, YAML LS, JSON LS, LemMinX, HTML LS, CSS LS, Emmet LS, PowerShell Editor Services, Tailwind CSS LS, Marksman, and Roslyn.
+
+Roslyn requires a .NET SDK/runtime. The Mason package is `roslyn-language-server`; unlike the old config, there is no machine-specific hard-coded DLL path.
