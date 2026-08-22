@@ -3,6 +3,7 @@
  *
  * The extension asks github-copilot/gpt-5.6-luna for a short slug, checks all
  * live Herdr agent names, then gives the current agent and tab the same name.
+ * If the agent already has a name other than the default "pi", it is left alone.
  * Herdr remains the final authority for name validation and uniqueness.
  *
  * Optional environment variables:
@@ -125,6 +126,9 @@ export default function (pi: ExtensionAPI) {
           throw new Error(agentsResult.stderr.trim() || "herdr agent list failed");
         }
         const initialAgents = parseAgentList(agentsResult.stdout);
+        const currentName = initialAgents.find((agent) => agent.pane_id === paneId)?.name;
+        if (currentName && currentName !== "pi") return;
+
         const otherNames = initialAgents
           .filter((agent) => agent.pane_id !== paneId && typeof agent.name === "string")
           .map((agent) => agent.name as string);
