@@ -10,6 +10,7 @@ import { closeSync, openSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { inHerdr, runInHerdrPopup } from "./herdr-pi-popup/popup.ts";
 
 interface LazygitResult {
 	status: number | null;
@@ -23,19 +24,26 @@ const EMPTY_COMPONENT = { render: () => [], invalidate: () => {} };
 
 export default function (pi: ExtensionAPI) {
 	pi.registerCommand("lazygit", {
-		description: "Open lazygit in the current directory and return to this Pi session on exit",
+		description: "Open lazygit in a Herdr popup, or in this terminal if not in Herdr",
 		handler: async (_args, ctx) => {
 			if (ctx.mode !== "tui") {
 				ctx.ui.notify("/lazygit requires Pi's interactive TUI mode", "error");
 				return;
 			}
 
-			await ctx.waitForIdle();
-
 			// Pi may retain an MSYS path such as /home/user/project in ctx.cwd,
 			// which a native Windows executable cannot chdir to. Node's cwd is the
 			// corresponding native path (for example C:\\msys64\\home\\...).
 			const launchCwd = process.platform === "win32" ? process.cwd() : ctx.cwd;
+
+			if (inHerdr) {
+				const result = await runInHerdrPopup(pi, { command: "lazygit", cwd: launchCwd });
+				reportLazygitResult(ctx, result, launchCwd);
+				return;
+			}
+
+			await ctx.waitForIdle();
+
 			const launchEnv = { ...process.env };
 			if (process.platform === "win32") {
 				// Pi was launched from MSYS2, whose /usr/bin/git can report POSIX
@@ -89,18 +97,26 @@ export default function (pi: ExtensionAPI) {
 				return EMPTY_COMPONENT;
 			});
 
-			if (result.error) {
-				ctx.ui.notify(`Unable to run lazygit: ${result.error}`, "error");
-			} else if (result.signal) {
-				ctx.ui.notify(`lazygit exited after signal ${result.signal}`, "warning");
-			} else if (result.status !== 0) {
-				const detail = result.stderr ? `: ${result.stderr.slice(-1500)}` : "";
-				const log = result.logPath ? ` (log: ${result.logPath})` : "";
-				ctx.ui.notify(
-					`lazygit exited with code ${result.status ?? "unknown"}${detail}${log} (cwd: ${launchCwd})`,
-					"warning",
-				);
-			}
+			reportLazygitResult(ctx, result, launchCwd);
 		},
 	});
+}
+
+function reportLazygitResult(
+	ctx: { ui: { notify: (message: string, level: "error" | "warning") => void } },
+	result: LazygitResult,
+	launchCwd: string,
+) {
+	if (result.error) {
+		ctx.ui.notify(`Unable to run lazygit: ${result.error}`, "error");
+	} else if (result.signal) {
+		ctx.ui.notify(`lazygit exited after signal ${result.signal}`, "warning");
+	} else if (result.status !== 0) {
+		const detail = result.stderr ? `: ${result.stderr.slice(-1500)}` : "";
+		const log = result.logPath ? ` (log: ${result.logPath})` : "";
+		ctx.ui.notify(
+			`lazygit exited with code ${result.status ?? "unknown"}${detail}${log} (cwd: ${launchCwd})`,
+			"warning",
+		);
+	}
 }

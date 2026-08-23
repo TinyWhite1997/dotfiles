@@ -10,7 +10,8 @@ import { spawnSync } from "node:child_process";
 import { closeSync, existsSync, openSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { SessionManager, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { SessionManager, type ExtensionAPI, type ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import { inHerdr, runInHerdrPopup, shQuote } from "./herdr-pi-popup/popup.ts";
 
 interface YaziResult {
 	status: number | null;
@@ -42,19 +43,36 @@ function cloneSessionToCwd(source: SessionSource, cwd: string): string {
 
 export default function (pi: ExtensionAPI) {
 	pi.registerCommand("yazi", {
-		description: "Open yazi and follow its directory on exit",
+		description: "Open yazi in a Herdr popup, or in this terminal if not in Herdr",
 		handler: async (_args, ctx) => {
 			if (ctx.mode !== "tui") {
 				ctx.ui.notify("/yazi requires Pi's interactive TUI mode", "error");
 				return;
 			}
 
-			await ctx.waitForIdle();
-
 			// Native Windows executables cannot chdir to the MSYS path Pi may retain.
 			const launchCwd = process.platform === "win32" ? process.cwd() : ctx.cwd;
 			const cwdFile = join(tmpdir(), `pi-yazi-cwd-${process.pid}`);
 			const stderrPath = join(tmpdir(), `pi-yazi-${process.pid}.log`);
+
+			if (inHerdr) {
+				rmSync(cwdFile, { force: true });
+				const popup = await runInHerdrPopup(pi, {
+					command: `yazi --cwd-file=${shQuote(cwdFile)}`,
+					cwd: launchCwd,
+				});
+				const result: YaziResult = {
+					status: popup.status,
+					signal: null,
+					error: popup.error,
+					cwd: existsSync(cwdFile) ? readFileSync(cwdFile, "utf8") : undefined,
+				};
+				rmSync(cwdFile, { force: true });
+				await followYaziCwd(ctx, result, launchCwd);
+				return;
+			}
+
+			await ctx.waitForIdle();
 
 			const result = await ctx.ui.custom<YaziResult>((tui, _theme, _keybindings, done) => {
 				tui.stop();
@@ -110,62 +128,66 @@ export default function (pi: ExtensionAPI) {
 				return EMPTY_COMPONENT;
 			});
 
-			if (result.error) {
-				ctx.ui.notify(`Unable to run yazi: ${result.error}`, "error");
-				return;
-			}
-			if (result.signal) {
-				ctx.ui.notify(`yazi exited after signal ${result.signal}`, "warning");
-				return;
-			}
-			if (result.status !== 0) {
-				const detail = result.stderr ? `: ${result.stderr.slice(-1500)}` : "";
-				const log = result.logPath ? ` (log: ${result.logPath})` : "";
-				ctx.ui.notify(
-					`yazi exited with code ${result.status ?? "unknown"}${detail}${log} (cwd: ${launchCwd})`,
-					"warning",
-				);
-				return;
-			}
-			if (!result.cwd) return; // Yazi's Q key deliberately keeps the current directory.
-
-			let selectedCwd: string;
-			try {
-				selectedCwd = resolve(result.cwd);
-				if (!statSync(selectedCwd).isDirectory()) throw new Error("not a directory");
-			} catch (error) {
-				ctx.ui.notify(`Yazi returned an invalid directory (${result.cwd}): ${String(error)}`, "error");
-				return;
-			}
-
-			const current = resolve(launchCwd);
-			if (
-				selectedCwd === current ||
-				(process.platform === "win32" && selectedCwd.toLowerCase() === current.toLowerCase())
-			) {
-				return;
-			}
-
-			let sessionFile: string;
-			try {
-				// Pi sessions have immutable working directories, so resume a clone of
-				// the active branch rooted at the directory selected in Yazi.
-				sessionFile = cloneSessionToCwd(ctx.sessionManager, selectedCwd);
-			} catch (error) {
-				ctx.ui.notify(`Unable to change Pi directory: ${error instanceof Error ? error.message : String(error)}`, "error");
-				return;
-			}
-
-			const switched = await ctx.switchSession(sessionFile, {
-				withSession: async (nextCtx) => {
-					try {
-						process.chdir(selectedCwd);
-					} catch (error) {
-						nextCtx.ui.notify(`Pi changed directory, but process.chdir failed: ${String(error)}`, "warning");
-					}
-				},
-			});
-			if (switched.cancelled) rmSync(sessionFile, { force: true });
+			await followYaziCwd(ctx, result, launchCwd);
 		},
 	});
+}
+
+async function followYaziCwd(ctx: ExtensionCommandContext, result: YaziResult, launchCwd: string) {
+	if (result.error) {
+		ctx.ui.notify(`Unable to run yazi: ${result.error}`, "error");
+		return;
+	}
+	if (result.signal) {
+		ctx.ui.notify(`yazi exited after signal ${result.signal}`, "warning");
+		return;
+	}
+	if (result.status !== 0) {
+		const detail = result.stderr ? `: ${result.stderr.slice(-1500)}` : "";
+		const log = result.logPath ? ` (log: ${result.logPath})` : "";
+		ctx.ui.notify(
+			`yazi exited with code ${result.status ?? "unknown"}${detail}${log} (cwd: ${launchCwd})`,
+			"warning",
+		);
+		return;
+	}
+	if (!result.cwd) return; // Yazi's Q key deliberately keeps the current directory.
+
+	let selectedCwd: string;
+	try {
+		selectedCwd = resolve(result.cwd);
+		if (!statSync(selectedCwd).isDirectory()) throw new Error("not a directory");
+	} catch (error) {
+		ctx.ui.notify(`Yazi returned an invalid directory (${result.cwd}): ${String(error)}`, "error");
+		return;
+	}
+
+	const current = resolve(launchCwd);
+	if (
+		selectedCwd === current ||
+		(process.platform === "win32" && selectedCwd.toLowerCase() === current.toLowerCase())
+	) {
+		return;
+	}
+
+	let sessionFile: string;
+	try {
+		// Pi sessions have immutable working directories, so resume a clone of
+		// the active branch rooted at the directory selected in Yazi.
+		sessionFile = cloneSessionToCwd(ctx.sessionManager, selectedCwd);
+	} catch (error) {
+		ctx.ui.notify(`Unable to change Pi directory: ${error instanceof Error ? error.message : String(error)}`, "error");
+		return;
+	}
+
+	const switched = await ctx.switchSession(sessionFile, {
+		withSession: async (nextCtx) => {
+			try {
+				process.chdir(selectedCwd);
+			} catch (error) {
+				nextCtx.ui.notify(`Pi changed directory, but process.chdir failed: ${String(error)}`, "warning");
+			}
+		},
+	});
+	if (switched.cancelled) rmSync(sessionFile, { force: true });
 }

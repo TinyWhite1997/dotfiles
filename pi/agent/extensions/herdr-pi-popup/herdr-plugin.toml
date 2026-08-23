@@ -1,0 +1,14 @@
+id = "pi.popup"
+name = "Pi popup"
+version = "0.1.0"
+min_herdr_version = "0.8.0"
+platforms = ["macos", "linux"]
+description = "Open a Pi command in a Herdr floating popup."
+
+[[panes]]
+id = "run"
+title = "pi"
+placement = "popup"
+width = "90%"
+height = "90%"
+command = ["sh", "-c", "cd \"${PI_HERDR_POPUP_CWD:-.}\" && eval \"$PI_HERDR_POPUP_CMD\"; status=$?; [ -n \"$PI_HERDR_POPUP_STATUS\" ] && printf '%s\\n' \"$status\" > \"$PI_HERDR_POPUP_STATUS\"; exit \"$status\""]
