@@ -4,6 +4,7 @@
  * The extension asks github-copilot/gpt-5.6-luna for a short slug, checks all
  * live Herdr agent names, then gives the current agent and tab the same name.
  * If the agent already has a name other than the default "pi", it is left alone.
+ * /new resets the Herdr agent and tab name back to "pi" so the next prompt can rename it.
  * Herdr remains the final authority for name validation and uniqueness.
  *
  * Optional environment variables:
@@ -18,6 +19,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 const PROVIDER = process.env.PI_HERDR_NAMING_PROVIDER || "github-copilot";
 const MODEL = process.env.PI_HERDR_NAMING_MODEL || "gpt-5.6-luna";
 const STATUS_KEY = "herdr-agent-name";
+const DEFAULT_NAME = "pi";
 const MAX_NAME_LENGTH = 32;
 
 type HerdrAgent = {
@@ -97,8 +99,22 @@ export default function (pi: ExtensionAPI) {
   let shouldNameOnNextPrompt = false;
   let namingController: AbortController | undefined;
 
-  pi.on("session_start", (_event, ctx) => {
+  async function resetToDefaultName() {
+    if (!paneId || !tabId) return;
+    const renamed = await pi.exec("herdr", ["agent", "rename", paneId, DEFAULT_NAME], {
+      timeout: 10_000,
+    });
+    if (renamed.code !== 0) {
+      await pi.exec("herdr", ["agent", "rename", paneId, "--clear"], { timeout: 10_000 });
+    }
+    await pi.exec("herdr", ["tab", "rename", tabId, DEFAULT_NAME], { timeout: 10_000 });
+  }
+
+  pi.on("session_start", async (event, ctx) => {
     shouldNameOnNextPrompt = inHerdr && Boolean(paneId) && Boolean(tabId) && !hasUserPrompt(ctx);
+    if (event.reason === "new" && shouldNameOnNextPrompt) {
+      await resetToDefaultName();
+    }
   });
 
   pi.on("session_shutdown", () => {
@@ -127,7 +143,7 @@ export default function (pi: ExtensionAPI) {
         }
         const initialAgents = parseAgentList(agentsResult.stdout);
         const currentName = initialAgents.find((agent) => agent.pane_id === paneId)?.name;
-        if (currentName && currentName !== "pi") return;
+        if (currentName && currentName !== DEFAULT_NAME) return;
 
         const otherNames = initialAgents
           .filter((agent) => agent.pane_id !== paneId && typeof agent.name === "string")
