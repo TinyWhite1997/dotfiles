@@ -7,15 +7,17 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 const PLUGIN_ID = "pi.popup";
 const PLUGIN_DIR = dirname(fileURLToPath(import.meta.url));
 
-export const inHerdr = process.env.HERDR_ENV === "1" && process.platform !== "win32";
-
-export function shQuote(value: string): string {
-	return `'${value.replace(/'/g, `'\\''`)}'`;
-}
+export const inHerdr = process.env.HERDR_ENV === "1";
 
 export async function runInHerdrPopup(
 	pi: ExtensionAPI,
-	opts: { command: string; cwd: string; timeoutMs?: number },
+	opts: {
+		command: string;
+		args?: string[];
+		cwd: string;
+		env?: Record<string, string>;
+		timeoutMs?: number;
+	},
 ): Promise<{ status: number | null; error?: string }> {
 	const ensured = await ensurePlugin(pi);
 	if (ensured) return { status: null, error: ensured };
@@ -32,7 +34,7 @@ export async function runInHerdrPopup(
 			"--plugin",
 			PLUGIN_ID,
 			"--entrypoint",
-			"run",
+			process.platform === "win32" ? "run-windows" : "run",
 			"--placement",
 			"popup",
 			"--width",
@@ -43,11 +45,13 @@ export async function runInHerdrPopup(
 			"--cwd",
 			opts.cwd,
 			"--env",
-			`PI_HERDR_POPUP_CWD=${opts.cwd}`,
+			`PI_HERDR_POPUP_RUNNER=${join(PLUGIN_DIR, "runner.cjs")}`,
 			"--env",
-			`PI_HERDR_POPUP_CMD=${opts.command}`,
+			`PI_HERDR_POPUP_ARGV=${JSON.stringify([opts.command, ...(opts.args ?? [])])}`,
 			"--env",
 			`PI_HERDR_POPUP_STATUS=${statusPath}`,
+			"--env",
+			`PI_HERDR_POPUP_ENV=${JSON.stringify(opts.env ?? {})}`,
 		],
 		{ timeout: 15_000 },
 	);

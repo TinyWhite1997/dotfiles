@@ -11,7 +11,7 @@ import { closeSync, existsSync, openSync, readFileSync, rmSync, statSync, writeF
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { SessionManager, type ExtensionAPI, type ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
-import { inHerdr, runInHerdrPopup, shQuote } from "./herdr-pi-popup/popup.ts";
+import { inHerdr, runInHerdrPopup } from "./herdr-pi-popup/popup.ts";
 
 interface YaziResult {
 	status: number | null;
@@ -58,7 +58,8 @@ export default function (pi: ExtensionAPI) {
 			if (inHerdr) {
 				rmSync(cwdFile, { force: true });
 				const popup = await runInHerdrPopup(pi, {
-					command: `yazi --cwd-file=${shQuote(cwdFile)}`,
+					command: process.platform === "win32" ? "yazi.exe" : "yazi",
+					args: [`--cwd-file=${cwdFile}`],
 					cwd: launchCwd,
 				});
 				const result: YaziResult = {

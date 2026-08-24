@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "pi -e ./yazi.ts --list-models"
+    "test": "node --test herdr-pi-popup/runner.test.cjs && pi -e ./yazi.ts --list-models"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.30.0",

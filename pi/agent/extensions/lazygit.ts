@@ -35,15 +35,6 @@ export default function (pi: ExtensionAPI) {
 			// which a native Windows executable cannot chdir to. Node's cwd is the
 			// corresponding native path (for example C:\\msys64\\home\\...).
 			const launchCwd = process.platform === "win32" ? process.cwd() : ctx.cwd;
-
-			if (inHerdr) {
-				const result = await runInHerdrPopup(pi, { command: "lazygit", cwd: launchCwd });
-				reportLazygitResult(ctx, result, launchCwd);
-				return;
-			}
-
-			await ctx.waitForIdle();
-
 			const launchEnv = { ...process.env };
 			if (process.platform === "win32") {
 				// Pi was launched from MSYS2, whose /usr/bin/git can report POSIX
@@ -52,6 +43,22 @@ export default function (pi: ExtensionAPI) {
 				launchEnv.PATH = `${windowsGitDir};${process.env.PATH ?? ""}`;
 				launchEnv.PWD = launchCwd;
 			}
+
+			if (inHerdr) {
+				const result = await runInHerdrPopup(pi, {
+					command: process.platform === "win32" ? "lazygit.exe" : "lazygit",
+					args: process.platform === "win32" ? ["--path", launchCwd] : [],
+					cwd: launchCwd,
+					env:
+						process.platform === "win32"
+							? { PATH: launchEnv.PATH ?? "", PWD: launchCwd }
+							: undefined,
+				});
+				reportLazygitResult(ctx, result, launchCwd);
+				return;
+			}
+
+			await ctx.waitForIdle();
 
 			const result = await ctx.ui.custom<LazygitResult>((tui, _theme, _keybindings, done) => {
 				tui.stop();
