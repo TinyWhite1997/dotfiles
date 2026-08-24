@@ -8,7 +8,8 @@ $BASEDIR = $PSScriptRoot
 
 Set-Location $BASEDIR
 Get-Location
-Set-Location $DOTBOT_DIR && git submodule update --init --recursive
+Set-Location $DOTBOT_DIR
+git submodule update --init --recursive
 foreach ($PYTHON in ('python', 'python3')) {
     # Python redirects to Microsoft Store in Windows 10 when not installed
     if (& { $ErrorActionPreference = "SilentlyContinue"
