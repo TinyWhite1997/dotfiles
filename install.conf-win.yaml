@@ -5,6 +5,11 @@
     ~/AppData/Roaming/yazi/config:
       path: config/yazi
       relink: true
+    ~/AppData/Roaming/nushell/config.nu:
+      path: config/nushell/config.nu
+      relink: true
+      force: true
+      create: true
     ~/AppData/Roaming/Rime:
       path: Rime
       relink: true
