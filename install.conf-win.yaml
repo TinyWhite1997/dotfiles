@@ -5,6 +5,10 @@
     ~/AppData/Roaming/yazi/config:
       path: config/yazi
       relink: true
+    ~/AppData/Roaming/worktrunk/config.toml:
+      path: worktrunk/config.toml
+      relink: true
+      create: true
     ~/AppData/Roaming/nushell/config.nu:
       path: config/nushell/config.nu
       relink: true

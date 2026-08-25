@@ -31,6 +31,10 @@
     D:/.config/yazi/flavors:
       path: flavors
       relink: true
+    ~/AppData/Roaming/worktrunk/config.toml:
+      path: worktrunk/config.toml
+      relink: true
+      create: true
 - shell:
   - [git submodule update --init --recursive, Installing submodules]
   - [npm install --prefix D:/.pi/agent/extensions, Installing Pi extension dependencies]

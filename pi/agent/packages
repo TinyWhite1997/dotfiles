@@ -1,6 +1,5 @@
 # Generated from Pi settings. Use pi install / pi remove, then commit.
 npm:pi-subagents
-git:github.com/DietrichGebert/ponytail
 npm:@dietrichgebert/ponytail
 npm:@narumitw/pi-goal
 npm:@ff-labs/pi-fff
