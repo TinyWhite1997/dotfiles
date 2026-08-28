@@ -1,10 +1,9 @@
 /**
- * Claude-style three-line status line for pi.
+ * Claude-style two-line status line for pi.
  *
  * Mirrors ~/.claude/statusline-command.ps1:
  *   1. user | folder | git branch
  *   2. model | context progress
- *   3. local date/time
  *
  * Commands:
  *   /statusline        Toggle the custom status line
@@ -21,19 +20,12 @@ const ICON_USER = "\uf007";
 const ICON_FOLDER = "\uf07b";
 const ICON_BRANCH = "\ue725";
 const ICON_ROBOT = "\udb81\udea8";
-const ICON_CLOCK = "\uf017";
 const BAR_WIDTH = 20;
 
 function progressBar(percent: number): string {
 	const bounded = Math.max(0, Math.min(100, percent));
 	const filled = Math.round((bounded * BAR_WIDTH) / 100);
 	return "▓".repeat(filled) + "░".repeat(BAR_WIDTH - filled);
-}
-
-function formatDateTime(date: Date): string {
-	const part = (value: number) => String(value).padStart(2, "0");
-	return `${date.getFullYear()}-${part(date.getMonth() + 1)}-${part(date.getDate())} `
-		+ `${part(date.getHours())}:${part(date.getMinutes())}:${part(date.getSeconds())}`;
 }
 
 function formatTokens(tokens: number): string {
@@ -44,18 +36,20 @@ function formatTokens(tokens: number): string {
 
 export default function (pi: ExtensionAPI) {
 	let enabled = true;
+	let refreshFooter: (() => void) | undefined;
 
 	const install = (ctx: ExtensionContext) => {
 		if (!enabled || ctx.mode !== "tui") return;
 
 		ctx.ui.setFooter((tui, theme, footerData) => {
-			const unsubscribeBranch = footerData.onBranchChange(() => tui.requestRender());
-			const clock = setInterval(() => tui.requestRender(), 1000);
+			const refresh = () => tui.requestRender();
+			const unsubscribeBranch = footerData.onBranchChange(refresh);
+			refreshFooter = refresh;
 
 			return {
 				dispose() {
-					clearInterval(clock);
 					unsubscribeBranch();
+					if (refreshFooter === refresh) refreshFooter = undefined;
 				},
 				invalidate() {},
 				render(width: number): string[] {
@@ -85,17 +79,17 @@ export default function (pi: ExtensionAPI) {
 						line2 += "  " + theme.fg("accent", `[${progressBar(pct)}] ${pctText}%`);
 					}
 
-					const line3 = theme.fg("text", `${ICON_CLOCK} ${formatDateTime(new Date())}`);
-					return [line1, line2, line3].map((line) => truncateToWidth(line, width));
+					return [line1, line2].map((line) => truncateToWidth(line, width));
 				},
 			};
 		});
 	};
 
 	pi.on("session_start", (_event, ctx) => install(ctx));
+	pi.on("agent_settled", () => refreshFooter?.());
 
 	pi.registerCommand("statusline", {
-		description: "Toggle the Claude-style three-line status line (on/off)",
+		description: "Toggle the Claude-style two-line status line (on/off)",
 		handler: async (args, ctx) => {
 			const choice = args.trim().toLowerCase();
 			if (choice === "on") enabled = true;
