@@ -1,0 +1,35 @@
+id = "worktrunk.windows"
+name = "Worktrunk (Windows)"
+version = "0.1.0"
+min_herdr_version = "0.7.0"
+description = "Switch, create, or remove worktrees through Worktrunk on Windows."
+platforms = ["windows"]
+
+# Windows plugin panes cannot reliably launch relative commands, so each action
+# starts a normal pane and runs the absolute PowerShell runner inside it.
+[[actions]]
+id = "open"
+title = "Worktree: switch / create"
+contexts = ["workspace"]
+command = [
+  "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
+  '''$u=New-Object System.Text.UTF8Encoding($false); [Console]::OutputEncoding=$u; $OutputEncoding=$u; $h=$env:HERDR_BIN_PATH; if(-not $h){$h='herdr'}; $p=((& $h plugin list --json|ConvertFrom-Json).result.plugins|Where-Object {$_.plugin_id -eq 'worktrunk.windows'}|Select-Object -First 1).plugin_root; if($p -and $p.StartsWith('\\?\')){$p=$p.Substring(4)}; & (Join-Path $p 'scripts\launch.ps1') -Mode default''',
+]
+
+[[actions]]
+id = "open-current"
+title = "Worktree: switch / create from current branch"
+contexts = ["workspace"]
+command = [
+  "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
+  '''$u=New-Object System.Text.UTF8Encoding($false); [Console]::OutputEncoding=$u; $OutputEncoding=$u; $h=$env:HERDR_BIN_PATH; if(-not $h){$h='herdr'}; $p=((& $h plugin list --json|ConvertFrom-Json).result.plugins|Where-Object {$_.plugin_id -eq 'worktrunk.windows'}|Select-Object -First 1).plugin_root; if($p -and $p.StartsWith('\\?\')){$p=$p.Substring(4)}; & (Join-Path $p 'scripts\launch.ps1') -Mode current''',
+]
+
+[[actions]]
+id = "remove"
+title = "Worktree: remove"
+contexts = ["workspace"]
+command = [
+  "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
+  '''$u=New-Object System.Text.UTF8Encoding($false); [Console]::OutputEncoding=$u; $OutputEncoding=$u; $h=$env:HERDR_BIN_PATH; if(-not $h){$h='herdr'}; $p=((& $h plugin list --json|ConvertFrom-Json).result.plugins|Where-Object {$_.plugin_id -eq 'worktrunk.windows'}|Select-Object -First 1).plugin_root; if($p -and $p.StartsWith('\\?\')){$p=$p.Substring(4)}; & (Join-Path $p 'scripts\launch.ps1') -Mode remove''',
+]
