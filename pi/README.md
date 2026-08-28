@@ -5,6 +5,7 @@ This directory contains the Pi extensions managed by Dotbot.
 ## Managed extensions
 
 - `agency-hub.ts`
+- `agency-mcp.ts` — opt-in Agency MCP Gateway integration
 - `claude-statusline.ts`
 - `copilot-web-search.ts` (`web_search` via Copilot plus a direct, SSRF-guarded, token-efficient `web_fetch`)
 - `herdr-agent-name.ts` (inside Herdr, uses `github-copilot/gpt-5.6-luna` to derive a unique live-agent name from the session's first prompt)
@@ -36,6 +37,18 @@ git commit                  # pre-commit copies settings.packages into agent/pac
 ```
 
 `./install` on another machine reads that file and runs `pi install` for each line. `pi` must already be on PATH.
+
+## Agency MCP (opt-in)
+
+Enable every Agency MCP toolset through its JIT-loading Gateway:
+
+```bash
+pi --agency
+```
+
+The extension exposes the Gateway's tools under the `agency_` prefix. It loads
+only the Gateway initially; use `agency_search_tools` and `agency_load_toolset`
+to discover and load any Agency MCP toolset without starting every server.
 
 ## Amplitude (opt-in)
 
