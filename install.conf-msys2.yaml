@@ -20,6 +20,10 @@
       path: copilot/copilot-instructions.md
       relink: true
       create: true
+    D:/.pi/agent/AGENTS.md:
+      path: pi/agent/AGENTS.md
+      relink: true
+      create: true
     D:/.pi/agent/extensions/:
       glob: true
       path: pi/agent/extensions/*

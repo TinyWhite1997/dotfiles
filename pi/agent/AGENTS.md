@@ -1,1 +1,1 @@
-Use herdr skill to schedule subagents / parallel agents
+Before making any code change, invoke the applicable `ponytail*` skill.
