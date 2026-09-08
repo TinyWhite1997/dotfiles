@@ -23,6 +23,8 @@ foreach ($PACKAGE in @(
     'JesseDuffield.lazygit'
     'Neovim.Neovim'
     'Nushell.Nushell'
+    'eza-community.eza'
+    'max-sixty.worktrunk'
 )) {
     if (winget list --id $PACKAGE --exact --source winget --accept-source-agreements | Select-String -Pattern $PACKAGE -SimpleMatch -Quiet) {
         continue
