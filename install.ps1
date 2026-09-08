@@ -22,6 +22,7 @@ foreach ($PACKAGE in @(
     'sxyazi.yazi'
     'JesseDuffield.lazygit'
     'Neovim.Neovim'
+    'Nushell.Nushell'
 )) {
     if (winget list --id $PACKAGE --exact --source winget --accept-source-agreements | Select-String -Pattern $PACKAGE -SimpleMatch -Quiet) {
         continue
