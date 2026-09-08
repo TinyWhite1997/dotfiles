@@ -20,6 +20,8 @@ foreach ($PACKAGE in @(
     'ajeetdsouza.zoxide'
     'ImageMagick.ImageMagick'
     'sxyazi.yazi'
+    'JesseDuffield.lazygit'
+    'Neovim.Neovim'
 )) {
     if (winget list --id $PACKAGE --exact --source winget --accept-source-agreements | Select-String -Pattern $PACKAGE -SimpleMatch -Quiet) {
         continue
