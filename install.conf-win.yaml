@@ -2,6 +2,7 @@
     .git/hooks/pre-commit:
       path: pi/git-pre-commit
       relink: true
+      force: true
       create: true
     ~/AppData/Local/nvim:
       path: config/nvim
@@ -13,6 +14,12 @@
     ~/AppData/Roaming/worktrunk/config.toml:
       path: worktrunk/config.toml
       relink: true
+      force: true
+      create: true
+    ~/AppData/Roaming/herdr/config.toml:
+      path: herdr/config.toml
+      relink: true
+      force: true
       create: true
     ~/AppData/Roaming/nushell/config.nu:
       path: config/nushell/config.nu
@@ -47,3 +54,4 @@
   - [git submodule update --init --recursive, Installing submodules]
   - [npm install --prefix "%USERPROFILE%/.pi/agent/extensions", Installing Pi extension dependencies]
   - [powershell -NoProfile -File pi/install-packages.ps1, Installing Pi packages]
+  - [powershell -NoProfile -ExecutionPolicy Bypass -File herdr/setup.ps1, Installing Herdr plugins and integrations]

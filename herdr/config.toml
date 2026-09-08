@@ -1,0 +1,58 @@
+onboarding = false
+
+[terminal]
+default_shell = "nu"
+shell_mode = "auto"
+
+[update]
+channel = "preview"
+
+[ui.toast]
+delivery = "system"
+
+[ui]
+pane_borders = "always"
+show_agent_labels_on_pane_borders = true
+agent_panel_sort = "priority"
+
+[ui.sidebar.agents]
+rows = [
+  ["state_icon", "machine", "workspace", "tab"],
+  [{ token = "agent", fg = "#cdd6f4", bold = true }],
+]
+
+[experimental]
+pane_history = true
+
+# Override herdr's built-in "new worktree" key (prefix+shift+g) with worktrunk's
+# default-branch switch/create picker:
+[[keys.command]]
+key = "prefix+shift+g"
+type = "plugin_action"
+command = "worktrunk.windows.open"
+description = "Worktree: switch / create from default branch"
+
+# Optional: bind current-branch creation separately.
+[[keys.command]]
+key = "prefix+shift+c"
+type = "plugin_action"
+command = "worktrunk.windows.open-current"
+description = "Worktree: switch / create from current branch"
+
+[[keys.command]]
+key = "prefix+shift+d"
+type = "plugin_action"
+command = "worktrunk.windows.remove"
+description = "Worktree: remove"
+
+[[keys.command]]
+key = "prefix+f"
+type = "plugin_action"
+command = "herdr-file-viewer.open-file-viewer-windows"
+description = "Open file viewer in split"
+
+[[keys.command]]
+key = "prefix+shift+f"
+type = "plugin_action"
+command = "herdr-file-viewer.open-file-viewer-tab-windows"
+description = "Open file viewer in tab"
