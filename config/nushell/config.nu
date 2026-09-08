@@ -1,3 +1,12 @@
+let worktree_root = if ("D:/" | path exists) {
+  "D:/worktrees"
+} else if ("Q:/" | path exists) {
+  "Q:/worktrees"
+} else {
+  $nu.home-path | path join "worktrees"
+}
+$env.WORKTRUNK_WORKTREE_PATH = $"($worktree_root)/{{ repo }}/{{ branch | sanitize }}"
+
 source ~/.zoxide.nu
 source ~/.worktrunk.nu
 alias wt = git-wt
