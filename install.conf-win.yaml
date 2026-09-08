@@ -26,6 +26,11 @@
       path: pi/agent/AGENTS.md
       relink: true
       create: true
+    ~/.pi/agent/skills/:
+      glob: true
+      path: pi/agent/skills/*
+      force: true
+      create: true
     ~/.pi/agent/extensions/:
       glob: true
       path: pi/agent/extensions/*
