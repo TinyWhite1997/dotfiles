@@ -1,10 +1,15 @@
 - link:
+    .git/hooks/pre-commit:
+      path: pi/git-pre-commit
+      relink: true
+      create: true
     ~/AppData/Local/nvim:
       path: config/nvim
       relink: true
     ~/AppData/Roaming/yazi/config:
       path: config/yazi
       relink: true
+      create: true
     ~/AppData/Roaming/worktrunk/config.toml:
       path: worktrunk/config.toml
       relink: true
@@ -41,4 +46,3 @@
   - [git submodule update --init --recursive, Installing submodules]
   - [npm install --prefix "%USERPROFILE%/.pi/agent/extensions", Installing Pi extension dependencies]
   - [powershell -NoProfile -File pi/install-packages.ps1, Installing Pi packages]
-  - [ln -sfn ../../pi/git-pre-commit .git/hooks/pre-commit, Installing Pi packages git hook]
