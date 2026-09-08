@@ -1,12 +1,21 @@
 id = "worktrunk.windows"
 name = "Worktrunk (Windows)"
-version = "0.1.0"
-min_herdr_version = "0.7.0"
+version = "0.2.0"
+min_herdr_version = "0.8.0"
 description = "Switch, create, or remove worktrees through Worktrunk on Windows."
 platforms = ["windows"]
 
-# Windows plugin panes cannot reliably launch relative commands, so each action
-# starts a normal pane and runs the absolute PowerShell runner inside it.
+[[panes]]
+id = "picker"
+title = "Worktree"
+placement = "popup"
+width = "80%"
+height = "60%"
+command = [
+  "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
+  '''try { & $env:WORKTRUNK_HERDR_RUNNER; $s=0 } catch { Write-Error $_; $s=1 }; if($s){Read-Host 'Press Enter to close'}; exit $s''',
+]
+
 [[actions]]
 id = "open"
 title = "Worktree: switch / create"

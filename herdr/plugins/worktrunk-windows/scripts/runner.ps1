@@ -128,7 +128,7 @@ function Invoke-Switch([string]$Worktrunk, [string]$HerdrBin, [string]$SourceCwd
     if (-not $WorktreePath) { throw "Worktrunk returned no worktree path for: $Branch" }
 
     $RootWorkspace = Get-RootWorkspaceId $HerdrBin $SourceCwd $SourceWorkspace
-    & $HerdrBin worktree open --workspace $RootWorkspace --path $WorktreePath --label $Branch --focus
+    & $HerdrBin worktree open --workspace $RootWorkspace --path $WorktreePath --label $Branch --focus | Out-Null
     return $LASTEXITCODE
 }
 
@@ -165,7 +165,7 @@ function Invoke-Remove([string]$Worktrunk, [string]$HerdrBin, [string]$SourceCwd
 
     & $Worktrunk remove --foreground $Branch
     $Status = $LASTEXITCODE
-    if ($Status -eq 0 -and $WorkspaceId) { & $HerdrBin workspace close $WorkspaceId }
+    if ($Status -eq 0 -and $WorkspaceId) { & $HerdrBin workspace close $WorkspaceId | Out-Null }
     return $Status
 }
 
@@ -187,6 +187,4 @@ $Status = if ($Mode -eq 'remove') {
     Invoke-Switch $Worktrunk $HerdrBin $SourceCwd $SourceWorkspace $Mode
 }
 
-# The picker is temporary. Keep it open only when an operation failed.
-if ($Status -eq 0 -and $env:HERDR_PANE_ID) { & $HerdrBin pane close $env:HERDR_PANE_ID }
-exit $Status
+if ($Status -ne 0) { throw "Worktrunk failed with exit code $Status." }
