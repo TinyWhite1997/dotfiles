@@ -1,4 +1,6 @@
 source ~/.zoxide.nu
+source ~/.worktrunk.nu
+alias wt = git-wt
 
 def --wrapped lg [...args] {
   ^lazygit ...$args

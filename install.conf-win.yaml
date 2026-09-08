@@ -43,6 +43,7 @@
       create: true
 - shell:
   - ['nu -n -c "zoxide init nushell | save -f ~/.zoxide.nu"', Generating zoxide Nushell integration]
+  - ['nu -n -c "git-wt.exe config shell init nu | save -f ~/.worktrunk.nu"', Generating Worktrunk Nushell integration]
   - [git submodule update --init --recursive, Installing submodules]
   - [npm install --prefix "%USERPROFILE%/.pi/agent/extensions", Installing Pi extension dependencies]
   - [powershell -NoProfile -File pi/install-packages.ps1, Installing Pi packages]
