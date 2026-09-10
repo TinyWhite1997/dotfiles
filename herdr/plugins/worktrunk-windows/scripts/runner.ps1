@@ -79,7 +79,7 @@ function Test-WorktrunkRef([string]$SourceCwd, [string]$Branch) {
 }
 
 function New-SwitchArguments([string]$Branch, [string]$Base, [bool]$Existing) {
-    $Arguments = @('switch', '--no-cd', '--format=json')
+    $Arguments = @('switch', '--no-cd')
     if ($Existing) { return $Arguments + $Branch }
     $Arguments += @('--create', $Branch)
     if ($Base -eq 'current') { $Arguments += @('--base', '@') }
@@ -118,17 +118,16 @@ function Invoke-Switch([string]$Worktrunk, [string]$HerdrBin, [string]$SourceCwd
     if (-not $Branch) { return 0 }
     $Existing = (Test-WorktrunkShortcut $Branch) -or (Test-WorktrunkRef $SourceCwd $Branch)
     $SwitchArgs = New-SwitchArguments $Branch $Base $Existing
-    $Result = Convert-HerdrJson (& $Worktrunk @SwitchArgs)
-    if ($LASTEXITCODE -ne 0) { return $LASTEXITCODE }
-
-    $WorktreePath = $Result.path
-    if (-not $WorktreePath) {
-        $WorktreePath = ($Worktrees | Where-Object { $_.branch -eq $Branch } | Select-Object -First 1).path
-    }
-    if (-not $WorktreePath) { throw "Worktrunk returned no worktree path for: $Branch" }
-
     $RootWorkspace = Get-RootWorkspaceId $HerdrBin $SourceCwd $SourceWorkspace
-    & $HerdrBin worktree open --workspace $RootWorkspace --path $WorktreePath --label $Branch --focus | Out-Null
+    $SwitchArgs += @(
+        '--execute', $HerdrBin, '--',
+        'worktree', 'open',
+        '--workspace', $RootWorkspace,
+        '--path', '{{ worktree_path }}',
+        '--label', '{{ branch }}',
+        '--focus'
+    )
+    & $Worktrunk @SwitchArgs | Out-Null
     return $LASTEXITCODE
 }
 

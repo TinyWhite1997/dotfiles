@@ -11,6 +11,21 @@ source ~/.zoxide.nu
 source ~/.worktrunk.nu
 alias wt = git-wt
 
+def "herdr switch" [
+  --create (-c)
+  branch: string
+] {
+  if $create {
+    ^git-wt switch -c $branch --no-cd
+  } else {
+    ^git-wt switch $branch --no-cd
+  }
+
+  if $env.LAST_EXIT_CODE == 0 {
+    ^herdr worktree open --cwd $env.PWD --branch $branch --focus
+  }
+}
+
 def --wrapped lg [...args] {
   ^lazygit ...$args
 }
