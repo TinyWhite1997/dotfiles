@@ -120,7 +120,7 @@ function Invoke-Switch([string]$Worktrunk, [string]$HerdrBin, [string]$SourceCwd
     $SwitchArgs = New-SwitchArguments $Branch $Base $Existing
     $RootWorkspace = Get-RootWorkspaceId $HerdrBin $SourceCwd $SourceWorkspace
     $SwitchArgs += @(
-        '--execute', $HerdrBin, '--',
+        '--execute', $HerdrBin.Replace('\', '/'), '--',
         'worktree', 'open',
         '--workspace', $RootWorkspace,
         '--path', '{{ worktree_path }}',
