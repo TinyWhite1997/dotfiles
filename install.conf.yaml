@@ -59,10 +59,6 @@
       path: pi/agent/extensions/*
       force: true
       create: true
-    ~/.paseo/config.json:
-      path: paseo/config.json
-      force: true
-      create: true
     ~/.zsh/fzf-tab:
       path: fzf-tab
       relink: true
