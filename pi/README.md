@@ -5,7 +5,7 @@ This directory contains the Pi extensions managed by Dotbot.
 ## Managed extensions
 
 - `agency-hub.ts`
-- `agency-mcp.ts` — opt-in Agency MCP Gateway integration
+- `agency-mcp.ts` — automatic Agency MCP Gateway integration when the CLI is available
 - `claude-statusline.ts`
 - `copilot-web-search.ts` (`web_search` via Copilot plus a direct, SSRF-guarded, token-efficient `web_fetch`)
 - `herdr-agent-name.ts` (inside Herdr, uses `github-copilot/gpt-5.6-luna` to derive a unique live-agent name from the session's first prompt)
@@ -70,17 +70,77 @@ compaction. Fabric's compaction engine is independent of full code mode; set
 `PI_FABRIC_PARENT_RUN` children, including Fabric actors, so they do not rename
 inherited parent panes.
 
-## Agency MCP (opt-in)
+## Agency MCP (automatic)
 
-Enable every Agency MCP toolset through its JIT-loading Gateway:
+Start Pi normally:
 
 ```bash
-pi --agency
+pi
 ```
+
+At session startup, the extension checks `agency --version` with a five-second
+timeout. If the CLI is available on PATH and runs successfully, it connects to
+Agency's MCP Gateway automatically; no startup flag is needed. If the CLI is
+missing, fails the check, or times out, it silently skips MCP startup without
+registering Agency tools or injecting its system-prompt guidance. Gateway
+connection errors after a successful check are still reported.
+
+Use `/agency-status` to inspect availability/connection state. After installing
+Agency or changing PATH, restart Pi (or `/reload` if this process already has the
+updated PATH).
 
 The extension exposes the Gateway's tools under the `agency_` prefix. It loads
 only the Gateway initially; use `agency_search_tools` and `agency_load_toolset`
 to discover and load any Agency MCP toolset without starting every server.
+
+### Finish PR long waits
+
+`agency_call_tool` calls targeting the default `finish-pr` toolset's
+`finish_pull_request` tool go directly to `agency mcp finish-pr` over stdio.
+Discovery/schema lookup still uses Gateway; other tool calls are unchanged.
+This avoids Gateway's 180-second backend timeout. The dedicated MCP receives
+Pi's current working directory and is closed on completion, cancellation, error,
+or session shutdown/reload. A 120-second silence timeout is refreshed by Agency's
+30-second progress notifications; `max_wait_seconds` remains server-controlled
+(default 1800). A terminal MCP error remains an error, not a successful result.
+
+Use `/skill:finish-pr <PR URL or id>` after installing the skills. The existing
+Dotbot skill glob includes `agent/skills/finish-pr`. To try it without installing:
+
+```bash
+pi --skill ./pi/agent/skills/finish-pr/SKILL.md
+```
+
+For Fabric full-code mode, merge this into `~/.pi/agent/fabric.json`, preserving
+other executor settings and existing `hostCallTimeouts` entries:
+
+```json
+{
+  "executor": {
+    "maxTimeoutMs": 2100000,
+    "hostCallTimeouts": {
+      "extensions.agency_call_tool": 2100000
+    }
+  }
+}
+```
+
+This gives captured Agency calls a 35-minute whole-program deadline (the default
+Fabric ceiling is only 15 minutes); other calls retain their normal default.
+Run one wait per Fabric program. Longer PR waits require a matching executor
+ceiling and per-invocation `timeoutMs`. Reload/restart Pi after configuration changes.
+The watcher can requeue policies and conditionally rebase/push: use `dry_run: true`
+for read-only monitoring, and do not run parallel model polling alongside it.
+
+Regression check (real MCP SDK, simulated clock; no PR access):
+
+```bash
+node --test pi/agent/extensions/tests/agency-finish-pr.test.cjs
+```
+
+Set `PI_FINISH_PR_STDIO_PROBE=1` when running that test to also exercise a real
+stdio child for 185 seconds and verify process cleanup on completion/cancel.
+The child is a local fixture, not Agency; neither test mode touches a PR.
 
 ## Amplitude (opt-in)
 
