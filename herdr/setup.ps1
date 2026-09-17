@@ -6,6 +6,7 @@ $Plugins = (herdr plugin list --json | ConvertFrom-Json).result.plugins.plugin_i
 foreach ($Plugin in @(
     @{ Id = 'pi.popup'; Path = "$Repo\pi\agent\extensions\herdr-pi-popup" }
     @{ Id = 'worktrunk.windows'; Path = "$PSScriptRoot\plugins\worktrunk-windows" }
+    @{ Id = 'fzf.popup'; Path = "$PSScriptRoot\plugins\fzf-popup" }
 )) {
     if ($Plugins -contains $Plugin.Id) {
         herdr plugin unlink $Plugin.Id

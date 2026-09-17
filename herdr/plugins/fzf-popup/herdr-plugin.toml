@@ -1,0 +1,14 @@
+id = "fzf.popup"
+name = "fzf popup"
+version = "0.1.0"
+min_herdr_version = "0.8.0"
+platforms = ["windows", "macos", "linux"]
+description = "Run shell fzf pickers in a Herdr floating window."
+
+[[panes]]
+id = "picker"
+title = "fzf"
+placement = "popup"
+width = "80%"
+height = "80%"
+command = ["node", "-e", "require(process.env.FZF_HERDR_RUNNER).main().then(code => { process.exitCode = code; }).catch(error => { console.error(error); process.exitCode = 2; })"]

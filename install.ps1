@@ -14,6 +14,7 @@ foreach ($PACKAGE in @(
     '7zip.7zip'
     'jqlang.jq'
     'oschwartz10612.Poppler'
+    'sharkdp.bat'
     'sharkdp.fd'
     'BurntSushi.ripgrep.MSVC'
     'junegunn.fzf'
@@ -27,6 +28,11 @@ foreach ($PACKAGE in @(
     'max-sixty.worktrunk'
 )) {
     if (winget list --id $PACKAGE --exact --source winget --accept-source-agreements | Select-String -Pattern $PACKAGE -SimpleMatch -Quiet) {
+        # Native Nushell integration needs 0.74.4+ for safe Ctrl+T path quoting.
+        if ($PACKAGE -eq 'junegunn.fzf' -and [version]((& fzf --version).Split(' ')[0]) -lt [version]'0.74.4') {
+            winget upgrade --id $PACKAGE --exact --source winget --silent --accept-package-agreements --accept-source-agreements --disable-interactivity
+            if ($LASTEXITCODE -ne 0) { throw 'Failed to upgrade fzf for Nushell integration.' }
+        }
         continue
     }
     winget install --id $PACKAGE --exact --source winget --silent --accept-package-agreements --accept-source-agreements --disable-interactivity
