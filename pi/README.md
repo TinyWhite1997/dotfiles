@@ -4,7 +4,6 @@ This directory contains the Pi extensions managed by Dotbot.
 
 ## Managed extensions
 
-- `agency-hub.ts`
 - `agency-mcp.ts` — automatic Agency MCP Gateway integration when the CLI is available
 - `claude-statusline.ts`
 - `copilot-web-search.ts` (`web_search` via Copilot plus a direct, SSRF-guarded, token-efficient `web_fetch`)
