@@ -73,3 +73,45 @@ alias l = eza -lh
 alias ls = eza -lh
 alias la = eza -lha
 alias ll = eza -lh
+
+# Inspired by Oh My Posh's lambdageneration: https://ohmyposh.dev/docs/themes#lambdageneration
+# Native rendering only: no Git, battery polling, filesystem probes, or child processes.
+let prompt_frame = $"(ansi reset)(ansi {fg: '#fb7e14'})"
+let prompt_edge = $"(ansi reset)(ansi {fg: '#292929'})"
+let prompt_bar = ansi {fg: '#fb7e14', bg: '#292929'}
+let prompt_lambda = ansi {fg: '#292929', bg: '#fb7e14'}
+let prompt_os = match $nu.os-info.name {
+  windows => ''
+  macos => ''
+  _ => ''
+}
+let prompt_user = $env.USERNAME? | default ($env.USER? | default '')
+let prompt_host = $env.COMPUTERNAME? | default ($env.HOSTNAME? | default $nu.os-info.name)
+let prompt_session = $"($prompt_user)@($prompt_host)" | str replace --all --regex '[\x00-\x1f\x7f-\x9f]' ''
+
+$env.PROMPT_COMMAND = {
+  let code = $env.LAST_EXIT_CODE? | default 0 | into int
+  let elapsed = $env.CMD_DURATION_MS? | default 0 | into int
+  let duration = if $elapsed >= 500 { $" ($elapsed * 1ms) " } else { '' }
+  let cwd = $env.PWD | str replace --all '\' '/' | str replace --all --regex '[\x00-\x1f\x7f-\x9f]' ''
+  let status = if $code == 0 { '' } else { $" exit ($code)" }
+  $"($prompt_frame)╭─($prompt_edge)($prompt_bar) ($prompt_os) ($duration) ($cwd)($status) ($prompt_edge)(ansi reset)\n($prompt_frame)╰─(ansi reset)"
+}
+$env.PROMPT_COMMAND_RIGHT = {
+  let right = $"($prompt_edge)($prompt_bar) ($prompt_session)  (date now | format date '%H:%M:%S, %e')  ($prompt_edge)(ansi reset)"
+  let left_width = do $env.PROMPT_COMMAND | ansi strip | lines | first | str stats | get unicode-width
+  let right_width = $right | ansi strip | str stats | get unicode-width
+  let gap = (try { (term size).columns } catch { 0 }) - $left_width - $right_width
+  # Keep the fill in the right prompt so Reedline hides it if the window is too narrow.
+  if $gap > 0 {
+    let line = '' | fill --character '─' --width $gap
+    $"($prompt_frame)($line)($right)"
+  } else {
+    $right
+  }
+}
+$env.config.render_right_prompt_on_last_line = false
+$env.PROMPT_INDICATOR = $"($prompt_frame)($prompt_lambda)λ($prompt_frame)(ansi reset) "
+$env.PROMPT_INDICATOR_VI_INSERT = $env.PROMPT_INDICATOR
+$env.PROMPT_INDICATOR_VI_NORMAL = $env.PROMPT_INDICATOR
+$env.PROMPT_MULTILINE_INDICATOR = $"($prompt_frame)··· (ansi reset)"
