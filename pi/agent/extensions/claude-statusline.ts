@@ -4,6 +4,7 @@
  * Mirrors ~/.claude/statusline-command.ps1:
  *   1. user | folder | git branch
  *   2. model | context progress
+ *   3. extension statuses (when present)
  *
  * Commands:
  *   /statusline        Toggle the custom status line
@@ -79,7 +80,11 @@ export default function (pi: ExtensionAPI) {
 						line2 += "  " + theme.fg("accent", `[${progressBar(pct)}] ${pctText}%`);
 					}
 
-					return [line1, line2].map((line) => truncateToWidth(line, width));
+					const statuses = Array.from(footerData.getExtensionStatuses().entries())
+						.sort(([a], [b]) => a.localeCompare(b))
+						.map(([, text]) => text.replace(/[\r\n\t]/g, " ").replace(/ +/g, " "));
+					return [line1, line2, ...(statuses.length ? [statuses.join(" ")] : [])]
+						.map((line) => truncateToWidth(line, width));
 				},
 			};
 		});

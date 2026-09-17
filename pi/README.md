@@ -10,6 +10,7 @@ This directory contains the Pi extensions managed by Dotbot.
 - `copilot-web-search.ts` (`web_search` via Copilot plus a direct, SSRF-guarded, token-efficient `web_fetch`)
 - `herdr-agent-name.ts` (inside Herdr, uses `github-copilot/gpt-5.6-luna` to derive a unique live-agent name from the session's first prompt)
 - `lazygit.ts` (`/lazygit` temporarily opens lazygit in the current directory, then returns to the same Pi session)
+- `neovim.ts` (`Ctrl+G` edits the current prompt in Neovim, using a Herdr popup when available)
 - `yazi.ts` (`/yazi` opens Yazi and follows the selected directory like the shell `y` wrapper)
 - `amplitude/` — opt-in official Amplitude MCP tools and skills
 - `revenuecat/` — opt-in official RevenueCat MCP tools and AI Toolkit skills
