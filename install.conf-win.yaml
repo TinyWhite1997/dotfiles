@@ -4,6 +4,11 @@
       relink: true
       force: true
       create: true
+    ~/AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Startup/RightShiftIME.ahk:
+      path: config/autohotkey/right-shift-ime.ahk
+      relink: true
+      force: true
+      create: true
     ~/AppData/Local/nvim:
       path: config/nvim
       relink: true
