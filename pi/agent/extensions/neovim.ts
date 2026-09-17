@@ -1,7 +1,8 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { CustomEditor, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { matchesKey } from "@earendil-works/pi-tui";
 import { inHerdr, runInHerdrPopup } from "./herdr-pi-popup/popup.ts";
@@ -56,9 +57,12 @@ async function editPrompt(pi: ExtensionAPI, ctx: ExtensionContext) {
 
 	try {
 		const command = process.platform === "win32" ? "nvim.exe" : "nvim";
+		// Resolve Dotbot's file symlink so the adjacent Lua config also works before relinking.
+		const configPath = join(dirname(realpathSync(fileURLToPath(import.meta.url))), "neovim.lua");
+		const args = ["-u", configPath, promptPath];
 		const result = inHerdr
-			? await runInHerdrPopup(pi, { command, args: [promptPath], cwd: launchCwd })
-			: await runInCurrentTerminal(ctx, command, promptPath, launchCwd);
+			? await runInHerdrPopup(pi, { command, args, cwd: launchCwd })
+			: await runInCurrentTerminal(ctx, command, args, launchCwd);
 
 		if (!result) return;
 		if (result.error) {
@@ -76,7 +80,7 @@ async function editPrompt(pi: ExtensionAPI, ctx: ExtensionContext) {
 function runInCurrentTerminal(
 	ctx: ExtensionContext,
 	command: string,
-	promptPath: string,
+	args: string[],
 	cwd: string,
 ): Promise<NeovimResult | undefined> {
 	return ctx.ui.custom<NeovimResult>((tui, _theme, _keybindings, done) => {
@@ -86,7 +90,7 @@ function runInCurrentTerminal(
 		setTimeout(() => {
 			let result: NeovimResult = { status: null };
 			try {
-				const child = spawnSync(command, [promptPath], {
+				const child = spawnSync(command, args, {
 					cwd,
 					stdio: "inherit",
 					env: { ...process.env, PWD: cwd },

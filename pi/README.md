@@ -24,6 +24,29 @@ The install configurations link each file into Pi's global extension directory i
 
 The installer runs `npm install` in Pi's extension directory for extension runtime dependencies. After installation, restart Pi or run `/reload` in an active Pi session.
 
+## Neovim prompt editor
+
+`Ctrl+G` uses `agent/extensions/neovim.lua` via `nvim -u` in both the current
+terminal and a Herdr popup. It requires the dotfiles Neovim 0.12+ configuration
+and reuses its native options, autocmds, platform settings, and editing keymaps.
+Normal `nvim` startup is unchanged.
+
+The prompt profile bypasses Lazy, LSP/Mason, Git, and Markdown rendering. It uses
+native Markdown syntax and loads only already-installed Catppuccin, surround,
+autopairs (without Treesitter), and better-escape (`jk`/`jj`). Catppuccin uses a
+separate cache with automatic integrations disabled. Missing plugins are skipped;
+a missing theme falls back to `habamax`. No plugins or tools are installed.
+Plugin-manager, Mason, Snacks, and render-markdown keymaps are omitted in this profile.
+
+Reload Pi with `/reload` after updating. The existing Windows terminal handoff
+delay and Herdr popup lifecycle are unchanged.
+
+Regression checks (Node 22.18+; Neovim checks skip if the executable is absent):
+
+```bash
+node --test pi/agent/extensions/tests/neovim.test.cjs
+```
+
 ## Third-party packages
 
 Do not commit `~/.pi/agent/settings.json` or `~/.pi/agent/npm/`. Those are machine-local.

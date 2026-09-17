@@ -31,9 +31,6 @@ map("n", "<Leader>bc", function()
     end
   end
 end, { desc = "Close other buffers" })
-map("n", "<Leader>bb", function()
-  Snacks.picker.buffers()
-end, { desc = "Find buffers" })
 
 map("n", "]t", "<Cmd>tabnext<CR>", { desc = "Next tab" })
 map("n", "[t", "<Cmd>tabprevious<CR>", { desc = "Previous tab" })
@@ -63,24 +60,6 @@ map("n", "[w", diagnostic_jump(-1, vim.diagnostic.severity.WARN), { desc = "Prev
 map("n", "]w", diagnostic_jump(1, vim.diagnostic.severity.WARN), { desc = "Next warning" })
 map("n", "gl", vim.diagnostic.open_float, { desc = "Hover diagnostics" })
 map("n", "<Leader>ld", vim.diagnostic.open_float, { desc = "Hover diagnostics" })
-
-map("n", "<Leader>pi", function()
-  require("lazy").install()
-end, { desc = "Plugins install" })
-map("n", "<Leader>ps", function()
-  require("lazy").home()
-end, { desc = "Plugins status" })
-map("n", "<Leader>pS", function()
-  require("lazy").sync()
-end, { desc = "Plugins sync" })
-map("n", "<Leader>pu", function()
-  require("lazy").check()
-end, { desc = "Plugins check updates" })
-map("n", "<Leader>pU", function()
-  require("lazy").update()
-end, { desc = "Plugins update" })
-map("n", "<Leader>pm", "<Cmd>Mason<CR>", { desc = "Mason" })
-map("n", "<Leader>pM", "<Cmd>MasonToolsUpdate<CR>", { desc = "Mason tools update" })
 
 map("n", "<Leader>ub", function()
   vim.o.background = vim.o.background == "dark" and "light" or "dark"
@@ -124,6 +103,33 @@ map("x", "J", "5j")
 map("x", "K", "5k")
 map("x", "H", "0")
 map("x", "L", "$")
+
+-- Pi only needs native editing maps, not commands for unloaded plugins.
+if vim.g.pi_prompt then
+  return
+end
+
+map("n", "<Leader>bb", function()
+  Snacks.picker.buffers()
+end, { desc = "Find buffers" })
+map("n", "<Leader>pi", function()
+  require("lazy").install()
+end, { desc = "Plugins install" })
+map("n", "<Leader>ps", function()
+  require("lazy").home()
+end, { desc = "Plugins status" })
+map("n", "<Leader>pS", function()
+  require("lazy").sync()
+end, { desc = "Plugins sync" })
+map("n", "<Leader>pu", function()
+  require("lazy").check()
+end, { desc = "Plugins check updates" })
+map("n", "<Leader>pU", function()
+  require("lazy").update()
+end, { desc = "Plugins update" })
+map("n", "<Leader>pm", "<Cmd>Mason<CR>", { desc = "Mason" })
+map("n", "<Leader>pM", "<Cmd>MasonToolsUpdate<CR>", { desc = "Mason tools update" })
+
 map("n", "<Leader><Leader>mo", function()
   require("render-markdown").enable()
 end, { desc = "Enable Markdown render" })
