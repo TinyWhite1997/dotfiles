@@ -38,6 +38,37 @@ git commit                  # pre-commit copies settings.packages into agent/pac
 
 `./install` on another machine reads that file and runs `pi install` for each line. `pi` must already be on PATH.
 
+## Fabric agents and Goal
+
+The package list uses `pi-fabric` instead of `pi-subagents`. Use Fabric's
+`agents.run()` / `agents.spawn()` and workflow helpers for child tasks; old
+`subagent` / `runs.run()` workflows are not interchangeable with these APIs.
+The old worker's strict native-tool allowlist conflicts with Fabric full code
+mode and can leave the child with no active tools.
+
+For full code mode alongside `pi-goal`, merge these entries into
+`~/.pi/agent/fabric.json` (preserve any existing `capture.keepVisible` entries):
+
+```json
+{
+  "fullCodeMode": true,
+  "capture": {
+    "keepVisible": ["fabric_exec", "goal_complete", "goal_blocked", "goal_wait"]
+  }
+}
+```
+
+Goal requires `goal_complete` and `goal_blocked` in Pi's active tool list;
+registered-but-hidden tools do not satisfy its check. Keep all three Goal tools
+on the native path, and call `goal_wait` alone. This addresses tool visibility,
+not an end-to-end compatibility guarantee for continuation, cancellation, or
+compaction. Fabric's compaction engine is independent of full code mode; set
+`compaction.engine` to `"pi"` if you want to retain Pi's existing engine.
+
+`herdr-agent-name.ts` skips both `PI_SUBAGENT_CHILD=1` and non-empty
+`PI_FABRIC_PARENT_RUN` children, including Fabric actors, so they do not rename
+inherited parent panes.
+
 ## Agency MCP (opt-in)
 
 Enable every Agency MCP toolset through its JIT-loading Gateway:

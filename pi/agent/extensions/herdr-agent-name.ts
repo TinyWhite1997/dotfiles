@@ -89,9 +89,9 @@ function parseAgentList(stdout: string): HerdrAgent[] {
 }
 
 export default function (pi: ExtensionAPI) {
-  // A pi-subagents child shares its parent's pane environment. Letting it run
-  // would rename the parent from the child task instead of the visible agent.
-  if (process.env.PI_SUBAGENT_CHILD === "1") return;
+  // Children can inherit the parent's pane environment; never rename it from
+  // a pi-subagents or Fabric child task (including persistent actors).
+  if (process.env.PI_SUBAGENT_CHILD === "1" || process.env.PI_FABRIC_PARENT_RUN) return;
 
   const inHerdr = process.env.HERDR_ENV === "1";
   const paneId = process.env.HERDR_PANE_ID;
