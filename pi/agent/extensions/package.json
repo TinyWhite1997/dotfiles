@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test herdr-pi-popup/runner.test.cjs tests/child-guards.test.cjs tests/agency-finish-pr.test.cjs tests/neovim.test.cjs && pi -e ./yazi.ts -e ./neovim.ts --list-models"
+    "test": "node --test herdr-pi-popup/runner.test.cjs tests/child-guards.test.cjs tests/herdr-agent-name.test.cjs tests/agency-finish-pr.test.cjs tests/neovim.test.cjs && pi -e ./yazi.ts -e ./neovim.ts --list-models"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.30.0",

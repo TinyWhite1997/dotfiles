@@ -4,7 +4,8 @@
  * The extension asks github-copilot/gpt-5.6-luna for a short slug, checks all
  * live Herdr agent names, then gives the current agent and tab the same name.
  * If the agent already has a name other than the default "pi", it is left alone.
- * /new resets the Herdr agent and tab name back to "pi" so the next prompt can rename it.
+ * /new resets the Herdr agent to "pi" so the next prompt can rename it.
+ * /new and quitting Pi restore the tab's current left-to-right position as its label.
  * Herdr remains the final authority for name validation and uniqueness.
  *
  * Optional environment variables:
@@ -98,6 +99,29 @@ export default function (pi: ExtensionAPI) {
   const tabId = process.env.HERDR_TAB_ID;
   let shouldNameOnNextPrompt = false;
   let namingController: AbortController | undefined;
+  let namingTask: Promise<void> | undefined;
+
+  async function resetTabName() {
+    if (!inHerdr || !tabId) return;
+    const listed = await pi.exec("herdr", ["tab", "list"], { timeout: 10_000 });
+    if (listed.code !== 0) {
+      throw new Error(listed.stderr.trim() || "herdr tab list failed");
+    }
+    const tabs: { tab_id: string; workspace_id: string }[] = JSON.parse(listed.stdout).result?.tabs;
+    if (!Array.isArray(tabs) || tabs.some((tab) =>
+      !tab || typeof tab.tab_id !== "string" || typeof tab.workspace_id !== "string")) {
+      throw new Error("herdr tab list response did not contain valid result.tabs");
+    }
+    const current = tabs.find((tab) => tab.tab_id === tabId);
+    if (!current) throw new Error("the current Herdr tab no longer exists");
+    const position = tabs.filter((tab) => tab.workspace_id === current.workspace_id)
+      .findIndex((tab) => tab.tab_id === tabId) + 1;
+    // ponytail: position snapshot; use a native auto-name reset when Herdr exposes one.
+    const result = await pi.exec("herdr", ["tab", "rename", tabId, String(position)], { timeout: 10_000 });
+    if (result.code !== 0) {
+      throw new Error(result.stderr.trim() || "herdr tab reset failed");
+    }
+  }
 
   async function resetToDefaultName() {
     if (!paneId || !tabId) return;
@@ -107,19 +131,22 @@ export default function (pi: ExtensionAPI) {
     if (renamed.code !== 0) {
       await pi.exec("herdr", ["agent", "rename", paneId, "--clear"], { timeout: 10_000 });
     }
-    await pi.exec("herdr", ["tab", "rename", tabId, DEFAULT_NAME], { timeout: 10_000 });
   }
 
   pi.on("session_start", async (event, ctx) => {
     shouldNameOnNextPrompt = inHerdr && Boolean(paneId) && Boolean(tabId) && !hasUserPrompt(ctx);
-    if (event.reason === "new" && shouldNameOnNextPrompt) {
-      await resetToDefaultName();
+    if (event.reason === "new") {
+      await resetTabName();
+      if (shouldNameOnNextPrompt) await resetToDefaultName();
     }
   });
 
-  pi.on("session_shutdown", () => {
+  pi.on("session_shutdown", async (event) => {
     namingController?.abort();
     namingController = undefined;
+    // Let any in-flight rename settle before resetting the label or replacing the session.
+    await namingTask;
+    if (event.reason === "quit") await resetTabName();
   });
 
   pi.on("before_agent_start", (event, ctx) => {
@@ -132,7 +159,7 @@ export default function (pi: ExtensionAPI) {
     namingController = controller;
     ctx.ui.setStatus(STATUS_KEY, "Naming Herdr agent…");
 
-    void (async () => {
+    namingTask = (async () => {
       try {
         const agentsResult = await pi.exec("herdr", ["agent", "list"], {
           signal: controller.signal,
@@ -156,6 +183,7 @@ export default function (pi: ExtensionAPI) {
         // endpoint. Calling pi-ai directly bypasses ModelRuntime.prepareRequest(),
         // so apply the resolved base URL as well as the token and headers.
         const authResult = await ctx.modelRegistry.getProviderAuth(PROVIDER);
+        controller.signal.throwIfAborted();
         if (!authResult) throw new Error(`no authentication for ${PROVIDER}/${MODEL}`);
         const { auth, env } = authResult;
         if (!auth.apiKey) throw new Error(`no API key for ${PROVIDER}/${MODEL}`);
@@ -222,6 +250,7 @@ export default function (pi: ExtensionAPI) {
         // a numeric suffix.
         let lastError = "";
         for (let attempt = 1; attempt <= 10; attempt += 1) {
+          controller.signal.throwIfAborted();
           const listResult = await pi.exec("herdr", ["agent", "list"], {
             signal: controller.signal,
             timeout: 10_000,
@@ -243,6 +272,7 @@ export default function (pi: ExtensionAPI) {
               .map((agent) => agent.name as string),
           );
           const candidate = uniqueAgentName(baseName, taken, attempt);
+          controller.signal.throwIfAborted();
           const renameResult = await pi.exec(
             "herdr",
             ["agent", "rename", paneId, candidate],
@@ -250,6 +280,7 @@ export default function (pi: ExtensionAPI) {
           );
 
           if (renameResult.code === 0) {
+            controller.signal.throwIfAborted();
             const tabRenameResult = await pi.exec(
               "herdr",
               ["tab", "rename", tabId, candidate],
