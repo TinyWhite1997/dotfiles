@@ -172,15 +172,31 @@ export default function agencyMcpExtension(pi: ExtensionAPI) {
     watcherTransport.stderr?.on("data", (chunk) => {
       logs = (logs + String(chunk)).slice(-8_000);
     });
+    const keepalive = new AbortController();
+    const requestSignal = signal ? AbortSignal.any([signal, keepalive.signal]) : keepalive.signal;
+    let pingTimer: ReturnType<typeof setInterval> | undefined;
+    let pingPending = false;
     finishPrClients.add(watcher);
     try {
       progress("Connecting to Agency finish-pr…");
       await watcher.connect(watcherTransport, { signal });
+      if (process.platform === "win32") {
+        // Windows stdin inheritance can stall Git while MCP waits for input.
+        // ponytail: remove pings when Agency closes stdin on async Git children.
+        pingTimer = setInterval(() => {
+          if (pingPending) return;
+          pingPending = true;
+          // Client close cancels pending pings without SDK-retained abort listeners.
+          void watcher.ping({ timeout: 120_000 })
+            .catch((error) => keepalive.abort(error))
+            .finally(() => { pingPending = false; });
+        }, 1_000);
+      }
       return await watcher.callTool(
         { name: "finish_pull_request", arguments: args as Record<string, unknown> },
         undefined,
         {
-          signal,
+          signal: requestSignal,
           // This is a silence timeout, not a wall-clock limit. Agency emits a
           // heartbeat every 30s and enforces max_wait_seconds itself (default 1800).
           timeout: 120_000,
@@ -193,6 +209,8 @@ export default function agencyMcpExtension(pi: ExtensionAPI) {
       const message = error instanceof Error ? error.message : String(error);
       throw new Error(logs.trim() ? `${message}\n${logs.trim()}` : message);
     } finally {
+      clearInterval(pingTimer);
+      keepalive.abort();
       finishPrClients.delete(watcher);
       await watcher.close().catch(() => {});
     }

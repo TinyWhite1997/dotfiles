@@ -126,6 +126,13 @@ or session shutdown/reload. A 120-second silence timeout is refreshed by Agency'
 30-second progress notifications; `max_wait_seconds` remains server-controlled
 (default 1800). A terminal MCP error remains an error, not a successful result.
 
+On Windows, the dedicated client also sends serial MCP `ping` requests once per
+second. These unblock Agency's Git startup when inheriting stdin races with the
+MCP reader. Pings never become progress updates or reset the tool's silence timer;
+only Agency's real progress notifications do that. Ping failures fail the call,
+and completion/cancellation/shutdown stops the timer. No Agency source patch or
+local Rust build is required.
+
 Use `/skill:finish-pr <PR URL or id>` after installing the skills. The existing
 Dotbot skill glob includes `agent/skills/finish-pr`. To try it without installing:
 

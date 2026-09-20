@@ -25,6 +25,7 @@ lines.on('line', line => {
   if (m.method === 'initialize') send({ id: m.id, result: {
     protocolVersion: '2025-06-18', capabilities: { tools: {} }, serverInfo: { name: 'fixture', version: '1' }
   }});
+  if (m.method === 'ping') send({ id: m.id, result: {} });
   if (m.method === 'tools/call') {
     const started = Date.now();
     const progress = () => send({ method: 'notifications/progress', params: {
@@ -81,6 +82,10 @@ class Transport {
       this.receive({ id: message.id, result: { tools: [{
         name: "call_tool", inputSchema: { type: "object" },
       }] } });
+    } else if (message.method === "ping") {
+      this.receive(this.mode === "ping-error"
+        ? { id: message.id, error: { code: -32603, message: "transport ping refused" } }
+        : { id: message.id, result: {} });
     } else if (message.method === "tools/call") {
       this.request = message;
       if (!finish) this.reply("through gateway");
@@ -213,7 +218,7 @@ test("Agency automatic startup and finish-pr lifecycle", async (t) => {
   for (const args of [{}, { pull_request: "123", dry_run: true, interval_seconds: 120, max_wait_seconds: 3600 }]) {
     await t.test(`heartbeats survive 180s and 30m; arguments ${JSON.stringify(args)}`, async (t) => {
       const { call, ctx } = await runtime(t);
-      t.mock.timers.enable({ apis: ["setTimeout", "Date"] });
+      t.mock.timers.enable({ apis: ["setTimeout", "setInterval", "Date"] });
       const updates = [];
       let outcome;
       const pending = call(args, undefined, (update) => updates.push(update))
@@ -240,9 +245,45 @@ test("Agency automatic startup and finish-pr lifecycle", async (t) => {
     });
   }
 
+  for (const mode of ["normal", "ping-error"]) {
+    await t.test(`Windows transport pings: ${mode}`, { skip: process.platform !== "win32" }, async (t) => {
+      const { call } = await runtime(t);
+      Transport.mode = mode;
+      t.mock.timers.enable({ apis: ["setTimeout", "setInterval", "Date"] });
+      const updates = [];
+      let outcome;
+      const pending = call({}, undefined, update => updates.push(update))
+        .then(value => { outcome = { value }; }, error => { outcome = { error }; });
+      await flush();
+      const watcher = Transport.instances.at(-1);
+      t.mock.timers.tick(1000);
+      await flush();
+      assert.equal(watcher.messages.filter(message => message.method === "ping").length, 1);
+      assert.deepEqual(updates.map(update => update.content[0].text), ["Connecting to Agency finish-pr…"],
+        "transport pings must not synthesize Agency progress");
+      if (mode === "ping-error") {
+        assert.match(outcome?.error?.message ?? "", /transport ping refused/);
+      } else {
+        watcher.progress(30);
+        await flush();
+        assert.match(updates.at(-1).content[0].text, /Watching PR: 30s/);
+        watcher.reply("Nothing needs you yet.");
+      }
+      await pending;
+      assert.equal(watcher.closed, true);
+      const messageCount = watcher.messages.length;
+      t.mock.timers.tick(3000);
+      await flush();
+      assert.equal(watcher.messages.length, messageCount, "completion/failure must stop pings");
+      const pingIds = new Set(watcher.messages.filter(message => message.method === "ping").map(message => message.id));
+      assert.equal(watcher.messages.some(message => message.method === "notifications/cancelled" && pingIds.has(message.params.requestId)), false,
+        "completed pings must not retain abort listeners and send stale cancellations");
+    });
+  }
+
   await t.test("silent backend times out, cancels and closes (no automatic retry)", async (t) => {
     const { call } = await runtime(t);
-    t.mock.timers.enable({ apis: ["setTimeout", "Date"] });
+    t.mock.timers.enable({ apis: ["setTimeout", "setInterval", "Date"] });
     const rejected = assert.rejects(call(), /Request timed out/);
     await flush();
     const count = Transport.instances.length, watcher = Transport.instances.at(-1);
