@@ -110,7 +110,7 @@ function Select-Branch([object[]]$Worktrees, [string]$SourceCwd, [string]$Base) 
 }
 
 function Invoke-Switch([string]$Worktrunk, [string]$HerdrBin, [string]$SourceCwd, [string]$SourceWorkspace, [string]$Base) {
-    $ListLines = & $Worktrunk list --format=json
+    $ListLines = & $Worktrunk -C $SourceCwd list --format=json
     if ($LASTEXITCODE -ne 0) { return $LASTEXITCODE }
     $Worktrees = Get-WorktrunkList $ListLines
 
@@ -127,12 +127,12 @@ function Invoke-Switch([string]$Worktrunk, [string]$HerdrBin, [string]$SourceCwd
         '--label', '{{ branch }}',
         '--focus'
     )
-    & $Worktrunk @SwitchArgs | Out-Null
+    & $Worktrunk -C $SourceCwd @SwitchArgs | Out-Null
     return $LASTEXITCODE
 }
 
 function Invoke-Remove([string]$Worktrunk, [string]$HerdrBin, [string]$SourceCwd) {
-    $ListLines = & $Worktrunk list --format=json
+    $ListLines = & $Worktrunk -C $SourceCwd list --format=json
     if ($LASTEXITCODE -ne 0) { return $LASTEXITCODE }
     $Worktrees = Get-WorktrunkList $ListLines
 
@@ -162,7 +162,7 @@ function Invoke-Remove([string]$Worktrunk, [string]$HerdrBin, [string]$SourceCwd
         } catch {}
     }
 
-    & $Worktrunk remove --foreground $Branch
+    & $Worktrunk -C $SourceCwd remove --foreground $Branch
     $Status = $LASTEXITCODE
     if ($Status -eq 0 -and $WorkspaceId) { & $HerdrBin workspace close $WorkspaceId | Out-Null }
     return $Status
