@@ -123,7 +123,7 @@ function Invoke-Switch([string]$Worktrunk, [string]$HerdrBin, [string]$SourceCwd
         '--execute', $HerdrBin.Replace('\', '/'), '--',
         'worktree', 'open',
         '--workspace', $RootWorkspace,
-        '--path', '{{ worktree_path }}',
+        '--branch', '{{ branch }}',
         '--label', '{{ branch }}',
         '--focus'
     )
