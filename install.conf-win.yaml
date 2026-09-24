@@ -4,8 +4,8 @@
       relink: true
       force: true
       create: true
-    ~/AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Startup/RightShiftIME.ahk:
-      path: config/autohotkey/right-shift-ime.ahk
+    ~/AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Startup/hotkeys.ahk:
+      path: config/autohotkey/hotkeys.ahk
       relink: true
       force: true
       create: true
