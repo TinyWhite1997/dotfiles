@@ -1,3 +1,6 @@
+[general]
+working_directory = "C:/Users/fwk67"
+
 [terminal.shell]
 program = "nu"
 
@@ -5,6 +8,8 @@ program = "nu"
 # Keep mouse dragging and window buttons, with a dark native title bar.
 decorations = "Full"
 decorations_theme_variant = "Dark"
+title = ""
+dynamic_title = false
 padding = { x = 12, y = 10 }
 dynamic_padding = true
 
