@@ -3,7 +3,7 @@ let worktree_root = if ("D:/" | path exists) {
 } else if ("Q:/" | path exists) {
   "Q:/worktrees"
 } else {
-  $nu.home-path | path join "worktrees"
+  $nu.home-dir | path join "worktrees"
 }
 $env.WORKTRUNK_WORKTREE_PATH = $"($worktree_root)/{{ repo }}/{{ branch | sanitize }}"
 
