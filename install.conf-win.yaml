@@ -26,6 +26,11 @@
       relink: true
       force: true
       create: true
+    ~/AppData/Roaming/alacritty/alacritty.toml:
+      path: config/alacritty/alacritty.toml
+      relink: true
+      force: true
+      create: true
     ~/AppData/Roaming/nushell/config.nu:
       path: config/nushell/config.nu
       relink: true
