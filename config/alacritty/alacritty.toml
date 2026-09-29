@@ -2,8 +2,9 @@
 program = "nu"
 
 [window]
-# Hide the native Windows title bar and borders.
-decorations = "None"
+# Keep mouse dragging and window buttons, with a dark native title bar.
+decorations = "Full"
+decorations_theme_variant = "Dark"
 padding = { x = 12, y = 10 }
 dynamic_padding = true
 
