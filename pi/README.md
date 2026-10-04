@@ -63,6 +63,13 @@ git commit                  # pre-commit copies settings.packages into agent/pac
 
 `./install` on another machine reads that file and runs `pi install` for each line. `pi` must already be on PATH.
 
+## Goal limits
+
+[`agent/pi-goal.json`](agent/pi-goal.json) sets Goal's automatic-work limit to
+100 model responses, including tool loops. Other guards keep their defaults.
+All installers link it into Pi's agent directory. Run the installer, then
+restart Pi or use `/reload` to apply it.
+
 ## Fabric agents and Goal
 
 The package list uses `pi-fabric` instead of `pi-subagents`. Use Fabric's

@@ -48,6 +48,10 @@
       path: pi/agent/AGENTS.md
       relink: true
       create: true
+    ~/.pi/agent/pi-goal.json:
+      path: pi/agent/pi-goal.json
+      relink: true
+      create: true
     ~/.pi/agent/skills/:
       glob: true
       path: pi/agent/skills/*
