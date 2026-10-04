@@ -13,6 +13,5 @@ Get-Content (Join-Path $root "agent/packages") | ForEach-Object {
     if ($LASTEXITCODE -ne 0) { throw "pi install $pkg failed" }
 }
 
-if (Get-Command bash -ErrorAction SilentlyContinue) {
-    & bash (Join-Path $root "sync-packages.sh")
-}
+& node (Join-Path $root "sync-packages.cjs")
+if ($LASTEXITCODE -ne 0) { throw "Package sync failed" }

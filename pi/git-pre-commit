@@ -2,5 +2,5 @@
 set -euo pipefail
 
 root="$(git rev-parse --show-toplevel)"
-"$root/pi/sync-packages.sh"
+node "$root/pi/sync-packages.cjs"
 git add -- "$root/pi/agent/packages"

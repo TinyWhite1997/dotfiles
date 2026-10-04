@@ -15,4 +15,4 @@ while IFS= read -r pkg || [ -n "$pkg" ]; do
 	pi install "$pkg"
 done <"$root/agent/packages"
 
-"$root/sync-packages.sh"
+node "$root/sync-packages.cjs"
