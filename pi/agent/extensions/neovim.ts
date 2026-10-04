@@ -42,6 +42,7 @@ export default function (pi: ExtensionAPI) {
 					})
 					.finally(() => {
 						editing = false;
+						tui.requestRender();
 					});
 			};
 			return editor;

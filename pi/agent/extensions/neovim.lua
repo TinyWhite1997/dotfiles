@@ -8,10 +8,19 @@ vim.g.mapleader = " "
 vim.g.maplocalleader = ","
 vim.opt.loadplugins = false
 
+-- Resolve the shared config from this file, not the user's Neovim config or cwd.
+local source = vim.uv.fs_realpath(debug.getinfo(1, "S").source:sub(2))
+local root = vim.fn.fnamemodify(source, ":h:h:h:h")
+vim.opt.rtp:prepend(root .. "/config/nvim")
+
 require "config.options"
 require "config.autocmds"
 require "config.keymaps"
 require "config.platform"
+
+-- Basic editing must work even when no optional plugins are installed.
+vim.keymap.set("i", "jk", "<Esc>", { desc = "Exit insert mode" })
+vim.keymap.set("i", "jj", "<Esc>", { desc = "Exit insert mode" })
 
 -- No statusline plugin: keep the mode and command line visible.
 vim.opt.showmode = true
@@ -48,8 +57,3 @@ end
 
 setup_plugin("nvim-surround", "nvim-surround", {})
 setup_plugin("nvim-autopairs", "nvim-autopairs", { check_ts = false, fast_wrap = {} })
-setup_plugin("better-escape.nvim", "better_escape", {
-  timeout = 300,
-  default_mappings = false,
-  mappings = { i = { j = { k = "<Esc>", j = "<Esc>" } } },
-})

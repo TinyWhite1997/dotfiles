@@ -33,7 +33,9 @@ Normal `nvim` startup is unchanged.
 
 The prompt profile bypasses Lazy, LSP/Mason, Git, and Markdown rendering. It uses
 native Markdown syntax and loads only already-installed Catppuccin, surround,
-autopairs (without Treesitter), and better-escape (`jk`/`jj`). Catppuccin uses a
+and autopairs (without Treesitter). Insert-mode `jk`/`jj` use native Escape mappings,
+so they also work without plugins. The leader is Space: `<leader>w` saves and
+`<leader>q` quits the window, confirming unsaved changes. Catppuccin uses a
 separate cache with automatic integrations disabled. Missing plugins are skipped;
 a missing theme falls back to `habamax`. No plugins or tools are installed.
 Plugin-manager, Mason, Snacks, and render-markdown keymaps are omitted in this profile.

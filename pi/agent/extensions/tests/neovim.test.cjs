@@ -7,7 +7,6 @@ const { dirname, join, resolve } = require("node:path");
 const { test } = require("node:test");
 
 const configPath = resolve(__dirname, "../neovim.lua");
-const nvimConfig = resolve(__dirname, "../../../../config/nvim");
 const nvim = process.platform === "win32" ? "nvim.exe" : "nvim";
 
 // Exercise the real Ctrl+G handler, but never open a terminal or a Herdr pane.
@@ -40,6 +39,12 @@ test("Ctrl+G shares its lightweight arguments and preserves prompt round trips",
       await t.test(`${route}, exit ${status}`, { timeout: 5000 }, async () => {
         let session, editor, promptPath, launches = 0, text = "# 原始提示\n\n保留空行";
         const terminal = [];
+        const frames = [];
+        const tui = {
+          stop: () => terminal.push("stop"),
+          start: () => terminal.push("start"),
+          requestRender: () => frames.push(text),
+        };
         const notifications = [];
         let finish;
         const finished = new Promise((resolve) => { finish = resolve; });
@@ -59,15 +64,19 @@ test("Ctrl+G shares its lightweight arguments and preserves prompt round trips",
         const ctx = {
           mode: "tui", cwd: tmpdir(),
           ui: {
-            setEditorComponent: (factory) => { editor = factory({}, {}, {}); },
+            setEditorComponent: (factory) => { editor = factory(tui, {}, {}); },
             getEditorText: () => text,
             setEditorText: (value) => { text = value; finish(); },
             notify: (...args) => { notifications.push(args); finish(); },
-            custom: (factory) => new Promise((done) => factory({
-              stop: () => terminal.push("stop"),
-              start: () => terminal.push("start"),
-              requestRender: () => terminal.push("render"),
-            }, {}, {}, done)),
+            custom: (factory) => new Promise((done) => {
+              const savedText = text;
+              factory(tui, {}, {}, (result) => {
+                // Match Pi: restore and render the old editor before resolving.
+                text = savedText;
+                tui.requestRender();
+                done(result);
+              });
+            }),
           },
         };
         session({}, { ...ctx, mode: "print" });
@@ -78,11 +87,13 @@ test("Ctrl+G shares its lightweight arguments and preserves prompt round trips",
         editor.handleInput("\x07");
         editor.handleInput("\x07"); // Ignore a second launch while editing.
         await finished;
+        await new Promise(setImmediate); // Let the launch finish, without another keypress.
         assert.equal(launches, 1);
         assert.equal(text, status === 0 ? "# 修改后\r\n\r\n提示词 ✓" : "# 原始提示\n\n保留空行");
         assert.equal(notifications.length, status === 0 ? 0 : 1);
         assert.equal(existsSync(dirname(promptPath)), false, "temporary prompt directory leaked");
-        assert.deepEqual(terminal, route === "terminal" ? ["stop", "start", "render"] : []);
+        assert.deepEqual(terminal, route === "terminal" ? ["stop", "start"] : []);
+        if (status === 0) assert.equal(frames.at(-1), text, "saved prompt must render without another keypress");
       });
     }
   }
@@ -101,17 +112,32 @@ vim.api.nvim_create_autocmd('VimEnter', { once = true, callback = function()
       assert(vim.bo.filetype == 'markdown')
       assert(vim.bo.syntax == 'markdown' or vim.treesitter.highlighter.active[vim.api.nvim_get_current_buf()], 'Markdown highlighter')
       assert(vim.o.clipboard == 'unnamedplus' and vim.o.showmode)
-      assert(vim.fn.maparg('J', 'n') == '5j' and vim.fn.maparg('H', 'x') == '0')
-      assert(vim.fn.maparg('<Leader>w', 'n') ~= '')
+      for _, mode in ipairs({'n', 'x'}) do
+        for key, rhs in pairs({H = '0', J = '5j', K = '5k', L = '$'}) do
+          assert(vim.fn.maparg(key, mode) == rhs, mode .. ': missing editing map ' .. key)
+        end
+      end
+      assert(vim.g.mapleader == ' ')
+      assert(vim.fn.maparg('<Leader>w', 'n') == '<Cmd>w<CR>')
+      assert(vim.fn.maparg('<Leader>q', 'n') == '<Cmd>confirm q<CR>')
       for _, key in ipairs({'<Leader>bb', '<Leader>pi', '<Leader>pm', '<Leader><Leader>mo'}) do
         assert(vim.fn.maparg(key, 'n') == '', key .. ' should not reference an unloaded plugin')
       end
-      for name, module in pairs({catppuccin = 'catppuccin', ['nvim-surround'] = 'nvim-surround', ['nvim-autopairs'] = 'nvim-autopairs', ['better-escape.nvim'] = 'better_escape'}) do
+      for name, module in pairs({catppuccin = 'catppuccin', ['nvim-surround'] = 'nvim-surround', ['nvim-autopairs'] = 'nvim-autopairs'}) do
         local installed = vim.uv.fs_stat(vim.fn.stdpath('data') .. '/lazy/' .. name) ~= nil
         assert((package.loaded[module] ~= nil) == installed, name .. ' was not loaded as expected')
       end
       local function keys(value)
         vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes(value, true, false, true), 'xt', false)
+      end
+      vim.api.nvim_buf_set_lines(0, 0, -1, false, vim.fn['repeat']({'abcdef'}, 11))
+      for _, mode in ipairs({'n', 'x'}) do
+        for key, position in pairs({H = {6, 0}, J = {11, 2}, K = {1, 2}, L = {6, mode == 'x' and 6 or 5}}) do
+          vim.api.nvim_win_set_cursor(0, {6, 2})
+          keys((mode == 'x' and 'v' or '') .. key)
+          assert(vim.deep_equal(vim.api.nvim_win_get_cursor(0), position), mode .. ': movement ' .. key)
+          keys('<Esc>')
+        end
       end
       if package.loaded['nvim-autopairs'] then
         vim.api.nvim_buf_set_lines(0, 0, -1, false, {''})
@@ -124,13 +150,16 @@ vim.api.nvim_create_autocmd('VimEnter', { once = true, callback = function()
         keys('ysiw)')
         assert(vim.api.nvim_get_current_line() == '(hello)', 'surround')
       end
-      if package.loaded['better_escape'] then
+      assert(not package.loaded['better_escape'])
+      for _, escape in ipairs({'jk', 'jj'}) do
+        assert(vim.fn.maparg(escape, 'i') == '<Esc>')
         vim.api.nvim_buf_set_lines(0, 0, -1, false, {''})
-        keys('ijj')
-        assert(vim.api.nvim_get_current_line() == '', 'better-escape')
+        keys('ihello' .. escape .. 'A!<Esc>')
+        assert(vim.api.nvim_get_current_line() == 'hello!', escape .. ' should exit insert mode')
       end
       vim.api.nvim_buf_set_lines(0, 0, -1, false, {'# 中文提示', '', '保留  两个空格 ✓'})
-      vim.cmd('write')
+      keys(' w')
+      assert(not vim.bo.modified, '<Leader>w should save')
       for name in pairs(package.loaded) do
         for _, prefix in ipairs({'lazy', 'mason', 'lspconfig', 'schemastore', 'snacks', 'render-markdown', 'nvim-treesitter'}) do
           assert(name:sub(1, #prefix) ~= prefix, 'unexpected plugin: ' .. name)
@@ -150,7 +179,13 @@ vim.api.nvim_create_autocmd('VimEnter', { once = true, callback = function()
         assert(vim.fn.maparg(key, 'n') ~= '', key .. ' missing from normal Neovim')
       end
     end, debug.traceback)
-    if not ok then vim.api.nvim_err_writeln(err); vim.cmd('cquit 1') else vim.cmd('qa!') end
+    if not ok then
+      vim.api.nvim_err_writeln(err)
+      vim.cmd('cquit 1')
+    else
+      vim.api.nvim_feedkeys(' q', 'xt', false)
+      vim.cmd('cquit 1') -- A working <Leader>q exits before reaching this line.
+    end
   end)
 end })
 `);
@@ -158,11 +193,11 @@ end })
     const prompt = join(directory, `prompt ${emptyData}.md`);
     writeFileSync(prompt, "# Test\n");
     const result = spawnSync(nvim, [
-      "--headless", "-i", "NONE", "-n", "--cmd", "lua vim.opt.rtp:prepend(vim.env.PI_TEST_NVIM_CONFIG)",
+      "--headless", "-i", "NONE", "-n",
       "-u", configPath, prompt, "-c", "lua dofile(vim.env.PI_TEST_NVIM_PROBE)",
     ], {
-      encoding: "utf8", timeout: 12000,
-      env: { ...process.env, PI_TEST_NVIM_CONFIG: nvimConfig, PI_TEST_NVIM_PROBE: probe,
+      encoding: "utf8", timeout: 12000, cwd: directory,
+      env: { ...process.env, XDG_CONFIG_HOME: join(directory, "empty-config"), PI_TEST_NVIM_PROBE: probe,
         PI_TEST_EMPTY_DATA: emptyData ? "1" : "0", XDG_CACHE_HOME: join(directory, "cache"),
         ...(emptyData ? { XDG_DATA_HOME: join(directory, "empty-data") } : {}),
       },
