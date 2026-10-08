@@ -1,0 +1,2 @@
+hindsight-api-slim[embedded-db,local-onnx]==0.10.2
+flashrank==0.2.10
