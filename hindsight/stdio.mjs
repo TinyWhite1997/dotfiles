@@ -1,10 +1,7 @@
-import { readFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { createTokenSource, createTunnelFetch, validateConfig } from './tunnel-auth.mjs';
+import { createTokenSource, createTunnelFetch, validateConfig, readConnection } from './tunnel-auth.mjs';
 
 // Bridge transports, not a hand-written list of tools: preserve MCP capabilities and notifications.
 export async function bridge(remote, local, log = console.error) {
@@ -33,8 +30,7 @@ export async function bridge(remote, local, log = console.error) {
 }
 
 async function main() {
-  const configPath = process.argv[2] ?? join(homedir(), '.hindsight', 'client.json');
-  const config = JSON.parse(await readFile(configPath, 'utf8'));
+  const config = await readConnection({ path: process.argv[2] });
   const url = validateConfig(config);
   const tokens = createTokenSource(config.tunnelId);
   await tokens.get(); // Fail early with a useful login error, without contaminating stdout.

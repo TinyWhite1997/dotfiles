@@ -3,23 +3,11 @@ $ErrorActionPreference = 'Stop'
 $Repo = Split-Path $PSScriptRoot -Parent
 $global:InstallerTestCalls = [System.Collections.Generic.List[object]]::new()
 $global:InstallerTestFail = ''
-$global:InstallerTestHasClient = $false
-$global:InstallerTestAnswers = [System.Collections.Generic.Queue[string]]::new()
 function Record([string]$Name, [object[]]$Arguments) {
     $global:InstallerTestCalls.Add(@{ Name = $Name; Arguments = @($Arguments); Profile = $env:DOTFILES_PROFILE })
     $global:LASTEXITCODE = 0
 }
-function Test-Path {
-    param([string]$LiteralPath)
-    if ($LiteralPath -eq "$HOME/.hindsight/client.json") { return $global:InstallerTestHasClient }
-    throw "Unexpected Test-Path in installer test: $LiteralPath"
-}
-function Read-Host {
-    param([string]$Prompt)
-    Record 'prompt' @($Prompt)
-    if ($global:InstallerTestAnswers.Count -eq 0) { throw 'Unexpected prompt' }
-    return $global:InstallerTestAnswers.Dequeue()
-}
+function Read-Host { throw 'Install must not prompt for Hindsight connection values.' }
 function node {
     Record 'node' $args
     if ($args[0] -eq '--version') { 'v24.0.0'; return }
@@ -36,8 +24,6 @@ function Assert([bool]$Condition, [string]$Message) { if (-not $Condition) { thr
 function Reset {
     $global:InstallerTestCalls.Clear()
     $global:InstallerTestFail = ''
-    $global:InstallerTestHasClient = $true
-    $global:InstallerTestAnswers.Clear()
 }
 
 $Original = (Get-Location).Path
@@ -69,41 +55,10 @@ Assert (@($global:InstallerTestCalls | Where-Object Name -eq winget).Count -ge 1
 Assert (@($global:InstallerTestCalls | Where-Object Name -eq npm).Count -eq 0) 'Personal installer must not install Hindsight dependencies.'
 
 Reset
-$global:InstallerTestHasClient = $false
-$global:InstallerTestAnswers.Enqueue('  first-machine.asse  ')
-$global:InstallerTestAnswers.Enqueue('  https://first-8888.asse.devtunnels.ms/mcp/shared/  ')
 & "$Repo/install.work.ps1" -AgentsOnly
-Assert (@($global:InstallerTestCalls | Where-Object Name -eq prompt).Count -eq 2) 'Fresh work install must ask for both connection values.'
 $Config = @($global:InstallerTestCalls | Where-Object { $_.Name -eq 'node' -and $_.Arguments[0] -like '*configure-agents.mjs' })
-Assert ($Config[0].Arguments -contains 'first-machine.asse' -and $Config[1].Arguments -contains 'https://first-8888.asse.devtunnels.ms/mcp/shared/') 'Prompt answers must be trimmed, validated, and persisted through the existing configurator.'
-
-Reset
-& "$Repo/install.work.ps1" -AgentsOnly
-Assert (@($global:InstallerTestCalls | Where-Object Name -eq prompt).Count -eq 0) 'Existing connection must not prompt again.'
-
-Reset
-$global:InstallerTestHasClient = $false
-& "$Repo/install.work.ps1" -AgentsOnly -TunnelId 'explicit.asse' -McpUrl 'https://explicit-8888.asse.devtunnels.ms/mcp/shared/'
-Assert (@($global:InstallerTestCalls | Where-Object Name -eq prompt).Count -eq 0) 'Explicit connection must work without interactive input.'
-
-Reset
-$global:InstallerTestAnswers.Enqueue('https://partial-8888.asse.devtunnels.ms/mcp/shared/')
-& "$Repo/install.work.ps1" -AgentsOnly -TunnelId 'partial.asse'
-Assert (@($global:InstallerTestCalls | Where-Object Name -eq prompt).Count -eq 1) 'A partial override must ask only for its missing value.'
-
-foreach ($InputFailure in @('empty', 'non-interactive')) {
-    Reset
-    $global:InstallerTestHasClient = $false
-    if ($InputFailure -eq 'empty') {
-        $global:InstallerTestAnswers.Enqueue(' ')
-        $global:InstallerTestAnswers.Enqueue('https://test-8888.asse.devtunnels.ms/mcp/shared/')
-    }
-    $Threw = $false
-    try { & "$Repo/install.work.ps1" -AgentsOnly } catch { $Threw = $true }
-    Assert $Threw "Invalid setup input '$InputFailure' must fail."
-    Assert (@($global:InstallerTestCalls | Where-Object { $_.Name -in @('git', 'npm', 'python', 'winget') }).Count -eq 0) 'Invalid setup must not change agent configuration or continue installation.'
-    Assert ($env:DOTFILES_PROFILE -eq 'test-previous-value') 'Input failure must restore the profile environment.'
-}
+Assert ($Config.Count -eq 2 -and $Config[1].Arguments -notcontains '--tunnel-id') 'Default Work install must need no connection arguments.'
+Assert ($global:InstallerTestCalls[-1].Arguments[0] -like '*smoke.mjs') 'Default Work install must still verify connectivity.'
 
 foreach ($Failure in @('preflight', 'npm', 'git', 'dotbot', 'smoke')) {
     Reset

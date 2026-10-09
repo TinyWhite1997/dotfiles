@@ -4,7 +4,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { randomUUID } from 'node:crypto';
-import { validateConfig } from '../hindsight/tunnel-auth.mjs';
+import { validateConfig, readConnection } from '../hindsight/tunnel-auth.mjs';
 
 const repository = fileURLToPath(new URL('../', import.meta.url));
 export const clients = [
@@ -53,14 +53,14 @@ export async function configureAgents({ profile, home = homedir(), repo = reposi
   const clientPath = join(home, '.hindsight', 'client.json');
   if (profile === 'work') {
     const previous = await snapshot(clientPath);
-    if (!previous && !tunnelId) throw new Error(`Provide -TunnelId/-McpUrl or create ${clientPath} first. No files changed.`);
-    const config = previous ? jsonObject(previous, clientPath) : {};
+    const config = previous ? jsonObject(previous, clientPath) : tunnelId ? {} :
+      await readConnection({ home, defaults: join(repo, 'hindsight', 'client.work.json') });
     if (tunnelId) Object.assign(config, { tunnelId, url });
     validateConfig(config);
     if (tunnelId) await plan(clientPath, `${JSON.stringify(config, null, 2)}\n`);
   }
 
-  const args = [join(resolve(repo), 'hindsight', 'stdio.mjs'), clientPath];
+  const args = [join(resolve(repo), 'hindsight', 'stdio.mjs')];
   for (const client of clients) {
     const path = join(home, client.file);
     const previous = await snapshot(path);

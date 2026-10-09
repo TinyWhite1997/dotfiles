@@ -27,6 +27,18 @@ test('MCP injection does not create guidance or work configuration on a fresh pe
   }
 });
 
+test('new Work machine registers four clients without local connection file or copied defaults', async t => {
+  const home = await fixture(t);
+  const result = await configureAgents({ profile: 'work', home });
+  assert.equal(result.changed.length, 4);
+  for (const client of clients) {
+    const entry = (await json(join(home, client.file))).mcpServers.hindsight;
+    assert.deepEqual(entry.args, [join(repo, 'hindsight/stdio.mjs')]);
+  }
+  await assert.rejects(lstat(join(home, '.hindsight/client.json')), { code: 'ENOENT' });
+  assert.deepEqual((await configureAgents({ profile: 'work', home })).changed, []);
+});
+
 test('work configures all four clients, preserves unrelated data, backs up, and is idempotent', async t => {
   const home = await fixture(t);
   for (const client of clients) await put(join(home, client.file), {
@@ -45,7 +57,7 @@ test('work configures all four clients, preserves unrelated data, backs up, and 
     assert.equal(config.projects['C:/repo'].trust, true);
     assert.equal(config.mcpServers.existing.command, 'existing-tool');
     assert.equal(config.mcpServers.hindsight.command, process.execPath);
-    assert.deepEqual(config.mcpServers.hindsight.args, [join(repo, 'hindsight/stdio.mjs'), join(home, '.hindsight/client.json')]);
+    assert.deepEqual(config.mcpServers.hindsight.args, [join(repo, 'hindsight/stdio.mjs')]);
     assert.equal((await json(`${path}.dotfiles-backup`)).mcpServers.hindsight, undefined);
   }
   assert.equal((await json(join(home, '.pi/agent/mcp.json'))).mcpServers.hindsight.timeout, 180);
@@ -69,7 +81,8 @@ test('missing/invalid connection and malformed/conflicting client config fail be
   for (const bad of ['missing', 'url', 'pair', 'json', 'shape', 'collision']) {
     const home = await fixture(t);
     let options = { profile: 'work', home };
-    if (bad !== 'missing') Object.assign(options, { tunnelId: connection.tunnelId, url: connection.url });
+    if (bad === 'missing') options.repo = join(home, 'missing-checkout');
+    else Object.assign(options, { tunnelId: connection.tunnelId, url: connection.url });
     if (bad === 'url') options.url = 'https://evil.test/mcp/shared/';
     if (bad === 'pair') delete options.url;
     if (bad === 'json') await put(join(home, '.pi/agent/mcp.json'), '{broken');

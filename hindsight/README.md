@@ -6,7 +6,7 @@ Agent → stdio.mjs → HTTPS + tunnel connect token → private Dev Tunnel → 
 
 No Agency, client-side forwarding port, anonymous tunnel access, or manually copied token. Node's MCP SDK handles Streamable HTTP/SSE; `devtunnel token` only issues credentials, never opens a forwarding connection.
 
-For work/personal Windows installation and automatic registration in Pi, Copilot, Claude Code and Cursor, use [the profile installers](../INSTALL.md). Work connections are configured locally, not in this repository.
+For work/personal Windows installation and automatic registration in Pi, Copilot, Claude Code and Cursor, use [the profile installers](../INSTALL.md). The shared Work endpoint is defined in `client.work.json`; `~/.hindsight/client.json` is an optional machine-local override. No credentials are stored in the shared default.
 
 ## Host configuration
 
@@ -26,7 +26,7 @@ devtunnel user login
 npm ci --prefix <repo>/hindsight
 ```
 
-Create `~/.hindsight/client.json`:
+The adapter uses `hindsight/client.work.json` directly by default. No connection file needs to be created on a new client. To use a different host/bank, optionally create `~/.hindsight/client.json`:
 
 ```json
 {
@@ -50,7 +50,7 @@ Register this **stdio** MCP entry with your agent (use an absolute path):
 
 For Copilot CLI, the equivalent is `copilot mcp add hindsight --timeout 180000 -- node <repo>/hindsight/stdio.mjs`. On Windows, `install.work.ps1 -AgentsOnly` registers all four clients while preserving other servers.
 
-An optional second argument selects another client config file. If the Hindsight server also uses application API-key authentication, supply `HINDSIGHT_API_KEY` through your client's private environment/secret storage, not Git.
+An optional second argument explicitly selects another client config file (a missing explicit file is an error). With no argument, local overrides take precedence over the live repository default. If the Hindsight server also uses application API-key authentication, supply `HINDSIGHT_API_KEY` through your client's private environment/secret storage, not Git.
 
 The agent owns the child process. There is no separate client daemon, localhost listener, or `devtunnel connect`. Merely connecting does not automatically save/retrieve conversations: agents must call `retain`/`sync_retain` and `recall`.
 

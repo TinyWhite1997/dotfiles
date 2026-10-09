@@ -1,17 +1,18 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { homedir, tmpdir } from 'node:os';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { readConnection } from './tunnel-auth.mjs';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
 const memoryCheck = process.argv.includes('--memory');
-let configPath = process.argv.slice(2).find(arg => arg !== '--memory') ?? join(homedir(), '.hindsight', 'client.json');
+let configPath = process.argv.slice(2).find(arg => arg !== '--memory');
 let temporary;
 if (memoryCheck) {
-  const config = JSON.parse(await readFile(configPath, 'utf8'));
+  const config = await readConnection({ path: configPath });
   const url = new URL(config.url);
   url.pathname = `/mcp/setup-check-${randomUUID()}/`;
   temporary = await mkdtemp(join(tmpdir(), 'hindsight-check-'));
@@ -20,7 +21,7 @@ if (memoryCheck) {
 }
 const transport = new StdioClientTransport({
   command: process.execPath,
-  args: [fileURLToPath(new URL('./stdio.mjs', import.meta.url)), configPath],
+  args: [fileURLToPath(new URL('./stdio.mjs', import.meta.url)), ...(configPath ? [configPath] : [])],
   stderr: 'inherit',
 });
 const client = new Client({ name: 'hindsight-smoke', version: '1' });

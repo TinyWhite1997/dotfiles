@@ -1,4 +1,7 @@
 import { execFile } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { promisify } from 'node:util';
 
 const exec = promisify(execFile);
@@ -18,6 +21,21 @@ export function validateConfig(config) {
     throw new Error('url must be the HTTPS single-bank endpoint printed by devtunnel host, in the same cluster');
   }
   return url;
+}
+
+export async function readConnection({ path, home = homedir(), defaults = new URL('./client.work.json', import.meta.url) } = {}) {
+  let text;
+  try {
+    text = await readFile(path ?? join(home, '.hindsight', 'client.json'), 'utf8');
+  } catch (error) {
+    // Only a missing implicit local config uses the shared Work default.
+    // Explicit paths and invalid/unreadable overrides must fail, not connect elsewhere.
+    if (path !== undefined || error.code !== 'ENOENT') throw error;
+    text = await readFile(defaults, 'utf8');
+  }
+  const config = JSON.parse(text.replace(/^\uFEFF/, ''));
+  validateConfig(config);
+  return config;
 }
 
 export async function issueToken(tunnelId) {
