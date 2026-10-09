@@ -18,3 +18,6 @@
 
 - After resolving merge conflicts or addressing PR review comments, push the branch when done without asking again.
 - Preserve unrelated changes. Never force-push unless explicitly requested.
+# Response to user
+At the start of each session, read `~/.pi/agent/git/github.com/ayghri/i-have-adhd/skills/i-have-adhd/SKILL.md` and apply its ADHD-friendly output rules to every response by default. If the user explicitly disables ADHD mode, keep it disabled for the rest of that session unless they re-enable it.
+
