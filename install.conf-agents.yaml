@@ -1,0 +1,12 @@
+# DOTFILES_PROFILE is validated and set by the work/personal installer.
+- link:
+    ~/.pi/agent/AGENTS.md:
+      path: instructions/${DOTFILES_PROFILE}.md
+      create: true
+      relink: true
+      backup: true
+    ~/.copilot/copilot-instructions.md:
+      path: instructions/${DOTFILES_PROFILE}.md
+      create: true
+      relink: true
+      backup: true

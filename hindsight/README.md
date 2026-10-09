@@ -6,11 +6,13 @@ Agent → stdio.mjs → HTTPS + tunnel connect token → private Dev Tunnel → 
 
 No Agency, client-side forwarding port, anonymous tunnel access, or manually copied token. Node's MCP SDK handles Streamable HTTP/SSE; `devtunnel token` only issues credentials, never opens a forwarding connection.
 
-## This host
+For work/personal Windows installation and automatic registration in Pi, Copilot, Claude Code and Cursor, use [the profile installers](../INSTALL.md). Work connections are configured locally, not in this repository.
+
+## Host configuration
 
 - Hindsight API: `http://127.0.0.1:8888` (loopback only; no UI installed).
-- Private tunnel: `hindsight-weikaifu.asse`, port 8888, owner-only ACL.
-- Shared bank: `https://kp5tqk5v-8888.asse.devtunnels.ms/mcp/shared/`.
+- Private tunnel: read `tunnelId` from `~/.hindsight/client.json`; port 8888, owner-only ACL.
+- Shared bank: read `url` from the same local file; use the actual URL printed by `devtunnel host` plus `/mcp/shared/`.
 - LLM: native `github-copilot` provider, `gpt-6-luna`; uses the host user's Copilot login, not Agency. Memory processing consumes Copilot allowance.
 - Embeddings: local multilingual E5 ONNX; reranking: local FlashRank; database: embedded PostgreSQL (pg0). Models download on first launch.
 - Host configuration, venv and logs live under `~/.hindsight/`; PostgreSQL data is at `~/.pg0/instances/hindsight/`, outside Git. Use a PostgreSQL dump or a stopped-instance backup before upgrades (do not copy a live data directory). Embedded PostgreSQL is for personal/development use, not HA.
@@ -28,8 +30,8 @@ Create `~/.hindsight/client.json`:
 
 ```json
 {
-  "tunnelId": "hindsight-weikaifu.asse",
-  "url": "https://kp5tqk5v-8888.asse.devtunnels.ms/mcp/shared/"
+  "tunnelId": "<tunnel-id.cluster>",
+  "url": "https://<host>-8888.<cluster>.devtunnels.ms/mcp/shared/"
 }
 ```
 
@@ -46,7 +48,7 @@ Register this **stdio** MCP entry with your agent (use an absolute path):
 }
 ```
 
-For Copilot CLI, the equivalent is `copilot mcp add hindsight --timeout 180000 -- node <repo>/hindsight/stdio.mjs`. This host already has that user-level entry in `~/.copilot/mcp-config.json`; other existing servers were left unchanged.
+For Copilot CLI, the equivalent is `copilot mcp add hindsight --timeout 180000 -- node <repo>/hindsight/stdio.mjs`. On Windows, `install.work.ps1 -AgentsOnly` registers all four clients while preserving other servers.
 
 An optional second argument selects another client config file. If the Hindsight server also uses application API-key authentication, supply `HINDSIGHT_API_KEY` through your client's private environment/secret storage, not Git.
 
@@ -93,7 +95,7 @@ pwsh -NoProfile -File ./hindsight/register-host.ps1
 Get-ScheduledTask -TaskName 'Hindsight-*'
 Get-Content "$HOME/.hindsight/api.log" -Tail 30
 Get-Content "$HOME/.hindsight/tunnel.log" -Tail 30
-devtunnel access list hindsight-weikaifu.asse
+devtunnel access list <tunnel-id.cluster>
 ```
 
 Logs are replaced on each service launch. To run in a terminal instead, use `run-service.ps1 -Service api` / `-Service tunnel` (do not run alongside the scheduled instances). Manage/renew the persistent tunnel with `devtunnel show` / `devtunnel update`; token renewal does not renew a deleted/expired tunnel resource.

@@ -17,13 +17,15 @@
       path: zsh/zimrc
       force: true
     D:/.copilot/copilot-instructions.md:
-      path: copilot/copilot-instructions.md
+      path: instructions/${DOTFILES_PROFILE}.md
       relink: true
       create: true
+      backup: true
     D:/.pi/agent/AGENTS.md:
-      path: pi/agent/AGENTS.md
+      path: instructions/${DOTFILES_PROFILE}.md
       relink: true
       create: true
+      backup: true
     D:/.pi/agent/pi-goal.json:
       path: pi/agent/pi-goal.json
       relink: true

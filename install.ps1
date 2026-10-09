@@ -1,52 +1,100 @@
-$ErrorActionPreference = "Stop"
+# Shared Windows installer. Prefer install.personal.ps1 or install.work.ps1.
+param(
+    [ValidateSet('personal', 'work')][string]$Profile = 'personal',
+    [switch]$AgentsOnly,
+    [string]$TunnelId,
+    [string]$McpUrl,
+    [string[]]$DotbotArgs = @()
+)
+$ErrorActionPreference = 'Stop'
 
-$CONFIG = "../install.conf-win.yaml"
-$DOTBOT_DIR = "dotbot"
-
-$DOTBOT_BIN = "bin/dotbot"
-$BASEDIR = $PSScriptRoot
-
-Set-Location $BASEDIR
-Get-Location
-
-foreach ($PACKAGE in @(
-    'Gyan.FFmpeg'
-    '7zip.7zip'
-    'jqlang.jq'
-    'oschwartz10612.Poppler'
-    'sharkdp.bat'
-    'sharkdp.fd'
-    'BurntSushi.ripgrep.MSVC'
-    'junegunn.fzf'
-    'ajeetdsouza.zoxide'
-    'ImageMagick.ImageMagick'
-    'sxyazi.yazi'
-    'JesseDuffield.lazygit'
-    'Neovim.Neovim'
-    'Nushell.Nushell'
-    'eza-community.eza'
-    'max-sixty.worktrunk'
-)) {
-    if (winget list --id $PACKAGE --exact --source winget --accept-source-agreements | Select-String -Pattern $PACKAGE -SimpleMatch -Quiet) {
+function Install-WingetPackage([string]$Id) {
+    if (winget list --id $Id --exact --source winget --accept-source-agreements | Select-String -Pattern $Id -SimpleMatch -Quiet) {
         # Native Nushell integration needs 0.74.4+ for safe Ctrl+T path quoting.
-        if ($PACKAGE -eq 'junegunn.fzf' -and [version]((& fzf --version).Split(' ')[0]) -lt [version]'0.74.4') {
-            winget upgrade --id $PACKAGE --exact --source winget --silent --accept-package-agreements --accept-source-agreements --disable-interactivity
+        if ($Id -eq 'junegunn.fzf' -and [version]((& fzf --version).Split(' ')[0]) -lt [version]'0.74.4') {
+            winget upgrade --id $Id --exact --source winget --silent --accept-package-agreements --accept-source-agreements --disable-interactivity
             if ($LASTEXITCODE -ne 0) { throw 'Failed to upgrade fzf for Nushell integration.' }
         }
-        continue
-    }
-    winget install --id $PACKAGE --exact --source winget --silent --accept-package-agreements --accept-source-agreements --disable-interactivity
-}
-
-Set-Location $DOTBOT_DIR
-git submodule update --init --recursive
-foreach ($PYTHON in ('python', 'python3')) {
-    # Python redirects to Microsoft Store in Windows 10 when not installed
-    if (& { $ErrorActionPreference = "SilentlyContinue"
-            ![string]::IsNullOrEmpty((&$PYTHON -V))
-            $ErrorActionPreference = "Stop" }) {
-        &$PYTHON $(Join-Path $BASEDIR -ChildPath $DOTBOT_DIR | Join-Path -ChildPath $DOTBOT_BIN) -d $BASEDIR -c $CONFIG $Args
         return
     }
+    winget install --id $Id --exact --source winget --silent --accept-package-agreements --accept-source-agreements --disable-interactivity
+    if ($LASTEXITCODE -ne 0) { throw "Failed to install $Id." }
 }
-Write-Error "Error: Cannot find Python."
+
+function Refresh-Path {
+    $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' +
+        [Environment]::GetEnvironmentVariable('Path', 'User') + ';' + $env:Path
+}
+
+$PreviousProfile = $env:DOTFILES_PROFILE
+$env:DOTFILES_PROFILE = $Profile
+Push-Location $PSScriptRoot
+try {
+    if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+        Install-WingetPackage 'OpenJS.NodeJS.LTS'
+        Refresh-Path
+    }
+    $NodeVersion = & node --version
+    if ($LASTEXITCODE -ne 0 -or [version]$NodeVersion.TrimStart('v') -lt [version]'22.0') {
+        throw 'Node.js 22+ is required; upgrade Node and retry.'
+    }
+
+    $Configure = Join-Path $PSScriptRoot 'scripts/configure-agents.mjs'
+    $ProfileArgs = @('--profile', $Profile)
+    if ($TunnelId) { $ProfileArgs += @('--tunnel-id', $TunnelId) }
+    if ($McpUrl) { $ProfileArgs += @('--url', $McpUrl) }
+    & node $Configure @ProfileArgs --check
+    if ($LASTEXITCODE -ne 0) { throw 'Profile preflight failed; agent configuration was not changed.' }
+
+    if (-not $AgentsOnly) {
+        foreach ($Package in @(
+            'Gyan.FFmpeg', '7zip.7zip', 'jqlang.jq', 'oschwartz10612.Poppler',
+            'sharkdp.bat', 'sharkdp.fd', 'BurntSushi.ripgrep.MSVC', 'junegunn.fzf',
+            'ajeetdsouza.zoxide', 'ImageMagick.ImageMagick', 'sxyazi.yazi',
+            'JesseDuffield.lazygit', 'Neovim.Neovim', 'Nushell.Nushell',
+            'eza-community.eza', 'max-sixty.worktrunk'
+        )) { Install-WingetPackage $Package }
+        Refresh-Path
+
+        git submodule update --init --recursive
+        if ($LASTEXITCODE -ne 0) { throw 'Git submodule installation failed.' }
+    } else {
+        git submodule update --init --recursive dotbot
+        if ($LASTEXITCODE -ne 0) { throw 'Dotbot submodule installation failed.' }
+    }
+    $Python = $null
+    foreach ($Candidate in @('python', 'python3')) {
+        if (Get-Command $Candidate -ErrorAction SilentlyContinue) {
+            & $Candidate -V
+            if ($LASTEXITCODE -eq 0) { $Python = $Candidate; break }
+        }
+    }
+    if (-not $Python) { throw 'Cannot find Python for Dotbot.' }
+    if (-not $AgentsOnly) {
+        & $Python "$PSScriptRoot/dotbot/bin/dotbot" -d $PSScriptRoot -c "$PSScriptRoot/install.conf-win.yaml" @DotbotArgs
+        if ($LASTEXITCODE -ne 0) { throw 'Dotbot installation failed.' }
+    }
+
+    if ($Profile -eq 'work') {
+        if (-not (Get-Command devtunnel -ErrorAction SilentlyContinue)) {
+            Install-WingetPackage 'Microsoft.devtunnel'
+            Refresh-Path
+        }
+        # npm.ps1 re-evaluates the invocation and can lose caller variables; use the native shim.
+        & npm.cmd ci --prefix "$PSScriptRoot/hindsight"
+        if ($LASTEXITCODE -ne 0) { throw 'Hindsight MCP dependency installation failed.' }
+    }
+    & $Python "$PSScriptRoot/dotbot/bin/dotbot" -d $PSScriptRoot -c "$PSScriptRoot/install.conf-agents.yaml" @DotbotArgs
+    if ($LASTEXITCODE -ne 0) { throw 'Agent guidance symlinks failed. Enable Windows Developer Mode or run with symlink privileges.' }
+    & node $Configure @ProfileArgs
+    if ($LASTEXITCODE -ne 0) { throw 'Agent profile configuration failed.' }
+    if ($Profile -eq 'work') {
+        # The host/database already exists. Verify the private tunnel without writing memories.
+        & node "$PSScriptRoot/hindsight/smoke.mjs"
+        if ($LASTEXITCODE -ne 0) { throw 'MCP configured but not connected. Check the host, run devtunnel user login as the tunnel owner, then rerun.' }
+    }
+    Write-Host "Installed $Profile profile. Restart Claude Code, Cursor and Copilot; /reload Pi."
+} finally {
+    $env:DOTFILES_PROFILE = $PreviousProfile
+    Pop-Location
+}

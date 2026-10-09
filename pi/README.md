@@ -19,10 +19,21 @@ The install configurations link each file into Pi's global extension directory i
 | Installer | Target |
 | --- | --- |
 | `./install` | `~/.pi/agent/extensions/` |
-| `.\install.ps1` | `~/.pi/agent/extensions/` |
+| `.\install.personal.ps1` / `.\install.work.ps1` | `~/.pi/agent/extensions/` |
 | `./install.msys2` | `D:/.pi/agent/extensions/` |
 
 The installer runs `npm install` in Pi's extension directory for extension runtime dependencies. After installation, restart Pi or run `/reload` in an active Pi session.
+
+## Work / personal guidance and Hindsight
+
+Windows has two explicit [profile installers](../INSTALL.md). Dotbot symlinks
+`instructions/work.md` or `instructions/personal.md` as user guidance for
+Pi and Copilot; source edits need no reinstall, only a client reload. Work also registers the private Hindsight stdio MCP in Pi,
+Copilot, Claude Code and Cursor; Personal removes only this adapter's MCP entry.
+`~/.pi/agent/mcp.json` and `~/.hindsight/client.json` remain machine-local,
+never linked from Git. Use `-AgentsOnly` to switch without reinstalling
+common dotfiles. Other platforms default to personal guidance;
+`DOTFILES_PROFILE=work ./install` selects work guidance without registering MCPs.
 
 ## Neovim prompt editor
 
