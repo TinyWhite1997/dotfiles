@@ -39,6 +39,21 @@ try {
         throw 'Node.js 22+ is required; upgrade Node and retry.'
     }
 
+    if ($Profile -eq 'work' -and ($TunnelId -or $McpUrl -or -not (Test-Path -LiteralPath "$HOME/.hindsight/client.json"))) {
+        if (-not $TunnelId -or -not $McpUrl) {
+            Write-Host 'First-time Hindsight setup: read tunnelId and url from ~/.hindsight/client.json on your existing host.'
+            Write-Host 'These values are saved only on this computer. No new server or tunnel will be created.'
+            try {
+                if (-not $TunnelId) { $TunnelId = ([string](Read-Host 'Tunnel ID (including cluster, e.g. name.asse)')).Trim() }
+                if (-not $McpUrl) { $McpUrl = ([string](Read-Host 'Full HTTPS MCP URL (ending in /mcp/<bank>/)')).Trim() }
+            } catch {
+                throw 'Cannot read setup input. Rerun install.work.ps1 with both -TunnelId and -McpUrl.'
+            }
+            if ([string]::IsNullOrWhiteSpace($TunnelId) -or [string]::IsNullOrWhiteSpace($McpUrl)) {
+                throw 'Hindsight connection cannot be empty. Supply both -TunnelId and -McpUrl, or enter them at the prompts.'
+            }
+        }
+    }
     $Configure = Join-Path $PSScriptRoot 'scripts/configure-agents.mjs'
     $ProfileArgs = @('--profile', $Profile)
     if ($TunnelId) { $ProfileArgs += @('--tunnel-id', $TunnelId) }

@@ -6,10 +6,10 @@ Run from PowerShell (7 recommended). The two public entrypoints share `install.p
 # Personal computer: common dotfiles + personal Pi/Copilot guidance, no work memory MCP.
 .\install.personal.ps1
 
-# Work computer with ~/.hindsight/client.json already configured:
+# Work computer: first run prompts for the connection; later runs reuse it.
 .\install.work.ps1
 
-# New work computer: supply the existing private tunnel ID and the actual host-printed MCP URL.
+# Optional: supply both values explicitly to skip the first-run prompts (also for automation).
 .\install.work.ps1 -TunnelId '<tunnel-id.cluster>' -McpUrl 'https://<host>-8888.<cluster>.devtunnels.ms/mcp/shared/'
 
 # Already installed dotfiles? Only switch agent guidance/MCP and install/check the MCP runtime:
@@ -52,7 +52,7 @@ The Work installer installs Node.js if absent, requires Node 22+, installs Dev T
 
 The agent applications themselves must be installed separately; config files can be prepared before installing them. Existing unrelated MCPs/settings and user-added Hindsight environment/tool controls are preserved. Same-name unrelated servers cause Work installation to stop rather than overwrite them. Invalid JSON and symlinked MCP configuration files are rejected before any profile files are written. Close clients while installing to avoid concurrent config writes. Existing files get a first-install `.dotfiles-backup`; treat those backups as private because configs can contain secrets. Updates use atomic per-file replacement, not a transaction across all clients; an I/O failure is reported and rerunning converges safely.
 
-The actual tunnel ID and URL live only in `~/.hindsight/client.json`, supplied by arguments or reused locally. No active MCP files, identity credentials, or tokens are committed or linked from the shared repository. Pulling dotfiles on a personal computer does **not** enable the MCP. The repo's other pre-existing integrations, including Agency, are not reconfigured by this profile switch; this installer manages only the Hindsight entry.
+The actual tunnel ID and URL live only in `~/.hindsight/client.json`. On a new work computer, `install.work.ps1` prompts for both values; read them from that file on the existing Hindsight host. The installer saves them locally after validation, so subsequent runs need no arguments. You can instead pass `-TunnelId` and `-McpUrl` explicitly (required for non-interactive automation). Empty input fails before changing agent configuration. If you supply only one argument, the installer asks for the other. No active MCP files, identity credentials, or tokens are committed or linked from the shared repository. Pulling dotfiles on a personal computer does **not** enable the MCP. The repo's other pre-existing integrations, including Agency, are not reconfigured by this profile switch; this installer manages only the Hindsight entry.
 
 Run `devtunnel user login` as an account with management access to the private tunnel. Work installation ends with a real stdio/HTTPS tool-list check; expired login, an offline host, or an expired tunnel causes a clear failure (configuration remains available for retry). No anonymous tunnel access, no client `devtunnel connect`, no client listening port, no Agency hop. Token refresh is built into the adapter.
 
