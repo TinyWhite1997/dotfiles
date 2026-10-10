@@ -75,7 +75,7 @@ git commit                  # pre-commit copies settings.packages into agent/pac
 
 `./install` on another machine reads that file and runs `pi install` for each line. `pi` must already be on PATH.
 
-## Goal-X and switching back
+## Goal-X
 
 The default package is `pi-goal-x@0.32.3`, pinned to the version checked with
 Pi `1.0.0` and Fabric `0.104.1`. `/goal <idea>` discusses a plan before confirmation;
@@ -85,9 +85,9 @@ Use `/goal-list` and `/goal-focus` to switch between open goals, and
 
 [`agent/pi-goal-x-settings.json`](agent/pi-goal-x-settings.json) sets:
 
-- `maxAutonomousRuns: 20`: a finite allowance per creation/resume, **not** the
-  old Goal's 100-response limit. Tool loops inside a run do not consume separate
-  runs; neither limit is a dollar cap. Adjust it in `/goal-settings`.
+- `maxAutonomousRuns: 100`: allow 100 extension-started runs per creation/resume.
+  One run can contain multiple model responses/tool loops, so this is not the
+  old package's response-count unit or a dollar cap. Adjust it in `/goal-settings`.
 - `autoSelectSingleGoal: false`: a fresh session does not automatically focus
   the project's only open goal. Select and explicitly resume it yourself.
 - `auditorProjectResources: false`: the independent auditor uses its isolated
@@ -100,25 +100,10 @@ All installers link the settings into Pi's agent directory. Goal files, evidence
 ledgers and archives live in `.pi/goals/`; keep that directory out of Git.
 Old goals are not migrated from the other package's session format.
 
-Do not enable both packages: they both register `/goal`. Pause the current goal,
-then run these commands outside Pi and restart it (recommended over an in-flight reload):
-
-```bash
-# Switch to Goal-X
-pi remove npm:@narumitw/pi-goal
-pi install npm:pi-goal-x@0.32.3
-
-# Switch back
-pi remove npm:pi-goal-x@0.32.3
-pi install npm:@narumitw/pi-goal@0.54.8
-```
-
-The old [`agent/pi-goal.json`](agent/pi-goal.json) remains linked and retains its
-100-response limit for rollback. Neither package removal deletes its saved goals.
-Reopen the original Pi session to recover an old Goal. Package commands update
-this machine; the pre-commit hook syncs the selected package into `agent/packages`.
-Existing machines still need to remove the old package explicitly: installers
-install the listed packages, but do not prune unlisted ones.
+The old Goal configuration is no longer managed or retained. Existing machines
+must remove `npm:@narumitw/pi-goal` before using Goal-X: both register `/goal`,
+and installers install listed packages without pruning unlisted ones.
+Restart Pi after migration rather than reloading an in-flight goal.
 
 ## Fabric agents and Goal-X
 
@@ -142,23 +127,30 @@ is a legacy preference, not an escape from full-code declarations. No foreground
 tool exceptions are needed for the tested captured execution path.
 
 Merge this into the machine-local `~/.pi/agent/fabric.json`, preserving other
-executor settings and timeout entries (including Agency's longer timeout):
+executor settings and timeout entries (including Agency's timeout):
 
 ```json
 {
   "fullCodeMode": true,
   "executor": {
-    "maxTimeoutMs": 2100000,
+    "maxTimeoutMs": 86400000,
     "hostCallTimeouts": {
-      "extensions.update_goal": 600000
+      "extensions.update_goal": 86400000
     }
   }
 }
 ```
 
-This gives completion auditing up to ten minutes instead of Fabric's default
-two-minute call deadline. Fabric's compaction engine is unchanged; Goal-X saves
-state to disk and observes Pi's compaction events.
+A call to `extensions.update_goal` raises its enclosing Fabric program's deadline
+to **24 hours**, Fabric's supported maximum. This is a cancellation timeout for
+that whole invocation, not a target review duration or a separate timer per
+review step. The shared `maxTimeoutMs` must also be 24 hours or it would clamp
+the audit allowance. Ordinary calls retain their default deadlines; Agency
+retains its 35-minute allowance. Manual cancellation and provider/tool-specific
+limits still apply, and a long audit can consume paid model calls.
+
+Fabric's compaction engine is unchanged; Goal-X saves state to disk and observes
+Pi's compaction events.
 
 The offline smoke probe loads the real installed extensions with a scripted
 provider: exclusive Fabric declarations, captured reads, automatic continuation,
@@ -235,7 +227,7 @@ other executor settings and existing `hostCallTimeouts` entries:
 ```json
 {
   "executor": {
-    "maxTimeoutMs": 2100000,
+    "maxTimeoutMs": 86400000,
     "hostCallTimeouts": {
       "extensions.agency_call_tool": 2100000
     }
@@ -244,7 +236,8 @@ other executor settings and existing `hostCallTimeouts` entries:
 ```
 
 This gives captured Agency calls a 35-minute whole-program deadline (the default
-Fabric ceiling is only 15 minutes); other calls retain their normal default.
+Fabric ceiling is only 15 minutes). The shared ceiling stays at 24 hours for
+Goal-X auditing; unrelated calls retain their own configured/default deadlines.
 Run one wait per Fabric program. Longer PR waits require a matching executor
 ceiling and per-invocation `timeoutMs`. Reload/restart Pi after configuration changes.
 The watcher can requeue policies and conditionally rebase/push: use `dry_run: true`

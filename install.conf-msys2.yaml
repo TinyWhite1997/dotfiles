@@ -26,10 +26,6 @@
       relink: true
       create: true
       backup: true
-    D:/.pi/agent/pi-goal.json:
-      path: pi/agent/pi-goal.json
-      relink: true
-      create: true
     D:/.pi/agent/pi-goal-x-settings.json:
       path: pi/agent/pi-goal-x-settings.json
       relink: true

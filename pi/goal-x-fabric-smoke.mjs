@@ -22,12 +22,13 @@ process.env.PI_GOAL_SETTINGS_FILE = path.join(cwd, '.pi', 'pi-goal-x-settings.js
 process.env.PI_GOAL_ROOT = path.join(cwd, '.pi', 'goals');
 fs.writeFileSync(path.join(cwd, 'evidence.txt'), 'compatibility evidence\n');
 const goalSettings = JSON.parse(fs.readFileSync(new URL('./agent/pi-goal-x-settings.json', import.meta.url), 'utf8'));
-assert(Number.isSafeInteger(goalSettings.maxAutonomousRuns) && goalSettings.maxAutonomousRuns > 0);
+assert.equal(goalSettings.maxAutonomousRuns, 100);
 assert.equal(goalSettings.autoSelectSingleGoal, false);
 assert.equal(goalSettings.auditorProjectResources, false);
-fs.writeFileSync(process.env.PI_GOAL_GLOBAL_SETTINGS_FILE, JSON.stringify({ ...goalSettings, maxAutonomousRuns: 4 }));
+fs.writeFileSync(process.env.PI_GOAL_GLOBAL_SETTINGS_FILE, JSON.stringify(goalSettings));
 fs.writeFileSync(path.join(agentDir, 'fabric.json'), JSON.stringify({
   configVersion: 4, fullCodeMode: true,
+  executor: { maxTimeoutMs: 86400000, hostCallTimeouts: { 'extensions.update_goal': 86400000 } },
   prewalk: { enabled: false }, mcp: { enabled: false }, mesh: { enabled: false },
 }));
 const sdkRequire = createRequire(path.join(sdkDir, 'package.json'));
