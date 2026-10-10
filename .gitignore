@@ -13,3 +13,5 @@ pi/agent/extensions/node_modules/
 # Fabric-generated MCP cache and live coordination state (not project config)
 /.pi/fabric/mcp-cache.json
 /.pi/fabric/mesh/
+# Goal-X objectives, evidence, ledgers and archives are runtime state
+/.pi/goals/

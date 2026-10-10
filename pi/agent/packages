@@ -1,6 +1,6 @@
 # Generated from Pi settings. Use pi install / pi remove, then commit.
 npm:@dietrichgebert/ponytail
-npm:@narumitw/pi-goal
 npm:@ff-labs/pi-fff
 npm:pi-fabric
 https://github.com/ayghri/i-have-adhd
+npm:pi-goal-x@0.32.3

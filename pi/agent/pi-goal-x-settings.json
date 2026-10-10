@@ -1,0 +1,5 @@
+{
+  "maxAutonomousRuns": 20,
+  "autoSelectSingleGoal": false,
+  "auditorProjectResources": false
+}

@@ -75,39 +75,107 @@ git commit                  # pre-commit copies settings.packages into agent/pac
 
 `./install` on another machine reads that file and runs `pi install` for each line. `pi` must already be on PATH.
 
-## Goal limits
+## Goal-X and switching back
 
-[`agent/pi-goal.json`](agent/pi-goal.json) sets Goal's automatic-work limit to
-100 model responses, including tool loops. Other guards keep their defaults.
-All installers link it into Pi's agent directory. Run the installer, then
-restart Pi or use `/reload` to apply it.
+The default package is `pi-goal-x@0.32.3`, pinned to the version checked with
+Pi `1.0.0` and Fabric `0.104.1`. `/goal <idea>` discusses a plan before confirmation;
+`/goal-direct <objective>` starts immediately. `/sisyphus` plans ordered work.
+Use `/goal-list` and `/goal-focus` to switch between open goals, and
+`/goal-pause` / `/goal-resume` to stop or continue the focused goal.
 
-## Fabric agents and Goal
+[`agent/pi-goal-x-settings.json`](agent/pi-goal-x-settings.json) sets:
+
+- `maxAutonomousRuns: 20`: a finite allowance per creation/resume, **not** the
+  old Goal's 100-response limit. Tool loops inside a run do not consume separate
+  runs; neither limit is a dollar cap. Adjust it in `/goal-settings`.
+- `autoSelectSingleGoal: false`: a fresh session does not automatically focus
+  the project's only open goal. Select and explicitly resume it yourself.
+- `auditorProjectResources: false`: the independent auditor uses its isolated
+  SDK session, not the parent's extensions or Fabric tool restrictions.
+
+Auditing remains enabled by default and uses the current model unless changed
+in `/goal-settings`. It adds model calls. Its tools include `bash`, so isolation
+from extensions is **not** a read-only OS sandbox or inherited Fabric approval policy.
+All installers link the settings into Pi's agent directory. Goal files, evidence,
+ledgers and archives live in `.pi/goals/`; keep that directory out of Git.
+Old goals are not migrated from the other package's session format.
+
+Do not enable both packages: they both register `/goal`. Pause the current goal,
+then run these commands outside Pi and restart it (recommended over an in-flight reload):
+
+```bash
+# Switch to Goal-X
+pi remove npm:@narumitw/pi-goal
+pi install npm:pi-goal-x@0.32.3
+
+# Switch back
+pi remove npm:pi-goal-x@0.32.3
+pi install npm:@narumitw/pi-goal@0.54.8
+```
+
+The old [`agent/pi-goal.json`](agent/pi-goal.json) remains linked and retains its
+100-response limit for rollback. Neither package removal deletes its saved goals.
+Reopen the original Pi session to recover an old Goal. Package commands update
+this machine; the pre-commit hook syncs the selected package into `agent/packages`.
+Existing machines still need to remove the old package explicitly: installers
+install the listed packages, but do not prune unlisted ones.
+
+## Fabric agents and Goal-X
 
 The package list uses `pi-fabric` instead of `pi-subagents`. Use Fabric's
 `agents.run()` / `agents.spawn()` and workflow helpers for child tasks; old
 `subagent` / `runs.run()` workflows are not interchangeable with these APIs.
-The old worker's strict native-tool allowlist conflicts with Fabric full code
-mode and can leave the child with no active tools.
 
-For full code mode alongside `pi-goal`, merge these entries into
-`~/.pi/agent/fabric.json` (preserve any existing `capture.keepVisible` entries):
+Goal-X tools work through Fabric capture in full code mode. Discover schemas
+with `tools.list` / `tools.describe`, then call `extensions.get_goal`,
+`extensions.create_goal`, `extensions.update_goal`, `extensions.set_goal_tasks`,
+`extensions.update_goal_task`, or the three drafting tools (`goal_question`,
+`goal_questionnaire`, `propose_goal_draft`) as appropriate. Call lifecycle,
+confirmation and wait operations alone in a Fabric program, and inspect their
+results; do not batch work after a terminating operation.
+
+There is no `goal_complete` or `goal_wait` in Goal-X. Completion uses
+`update_goal({status: "complete"})`. New external-wait declarations require
+Goal-X's opt-in `strictExecutionContract`; leave it off for ordinary auto-continuation.
+Do not copy old Goal tool names into Fabric. In Fabric `0.104.1`, `capture.keepVisible`
+is a legacy preference, not an escape from full-code declarations. No foreground
+tool exceptions are needed for the tested captured execution path.
+
+Merge this into the machine-local `~/.pi/agent/fabric.json`, preserving other
+executor settings and timeout entries (including Agency's longer timeout):
 
 ```json
 {
   "fullCodeMode": true,
-  "capture": {
-    "keepVisible": ["fabric_exec", "goal_complete", "goal_blocked", "goal_wait"]
+  "executor": {
+    "maxTimeoutMs": 2100000,
+    "hostCallTimeouts": {
+      "extensions.update_goal": 600000
+    }
   }
 }
 ```
 
-Goal requires `goal_complete` and `goal_blocked` in Pi's active tool list;
-registered-but-hidden tools do not satisfy its check. Keep all three Goal tools
-on the native path, and call `goal_wait` alone. This addresses tool visibility,
-not an end-to-end compatibility guarantee for continuation, cancellation, or
-compaction. Fabric's compaction engine is independent of full code mode; set
-`compaction.engine` to `"pi"` if you want to retain Pi's existing engine.
+This gives completion auditing up to ten minutes instead of Fabric's default
+two-minute call deadline. Fabric's compaction engine is unchanged; Goal-X saves
+state to disk and observes Pi's compaction events.
+
+The offline smoke probe loads the real installed extensions with a scripted
+provider: exclusive Fabric declarations, captured reads, automatic continuation,
+isolated audit reads using the parent's provider, rejection without archival,
+and approval with termination/archival. It makes no paid model calls:
+
+```bash
+node pi/goal-x-fabric-smoke.mjs <pi-package-dir> <fabric-package-dir> <goal-x-package-dir>
+```
+
+This is not a full compatibility guarantee: interactive dialogs, Escape during
+an audit, automatic compaction under context pressure, and resumed/forked Fabric
+workers are not covered. Goal-X's delegated-session guard recognizes
+`PI_SUBAGENT_CHILD`/`PI_SUBAGENT_DEPTH`, not Fabric's markers. Keep goal ownership
+in the parent; do not resume its goal in workers or enable automatic single-goal
+selection. Use fresh task-scoped children rather than forks inheriting an active
+goal transcript until that path is verified.
 
 `herdr-agent-name.ts` skips both `PI_SUBAGENT_CHILD=1` and non-empty
 `PI_FABRIC_PARENT_RUN` children, including Fabric actors, so they do not rename
