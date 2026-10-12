@@ -263,9 +263,9 @@ pi --amplititude
 ```
 
 The spelling above is retained for compatibility with the original flag request;
-`pi --amplitude` is also accepted. On first use, `mcp-remote` opens the browser for
-Amplitude OAuth. Authentication is cached by `mcp-remote`. The endpoint can be overridden
-with `PI_AMPLITUDE_MCP_URL`.
+`pi --amplitude` is also accepted. The extension registers a native HTTP MCP server
+with Pi. Use `/mcp` to inspect its connection or `/mcp login amplitude` to sign in.
+The endpoint can be overridden with `PI_AMPLITUDE_MCP_URL`.
 
 ## RevenueCat (opt-in)
 
@@ -276,9 +276,38 @@ RevenueCat is disabled by default. Enable its hosted MCP tools and the main plug
 pi --revenuecat
 ```
 
-On first use, `mcp-remote` opens the browser for RevenueCat OAuth. Authentication is cached by
-`mcp-remote`. Override the hosted endpoint with `PI_REVENUECAT_MCP_URL` when needed. The
-specialized `revenuecat-play-billing` skill pack is not loaded by this flag.
+The extension registers a native HTTP MCP server with Pi. Use `/mcp` to inspect
+its connection or `/mcp login revenuecat` to sign in. Override the hosted endpoint
+with `PI_REVENUECAT_MCP_URL` when needed. The specialized `revenuecat-play-billing`
+skill pack is not loaded by this flag.
+
+### Native MCP requirements and migration
+
+These two integrations require Pi's `registerMcpServer` API and built-in MCP support
+(tested with Pi 0.99.2). They retain the opt-in flags and official skills, but Pi now
+owns OAuth, connection cleanup, tool discovery, and result handling; no `mcp-remote`
+process is started. Agency and Fabric are unchanged.
+
+- Tools use `mcp__amplitude__<tool>` and `mcp__revenuecat__<tool>` names and default
+  to `codemode` exposure. Discover them through native codemode/tool search or Fabric's
+  `tools.search`. Fabric full-code mode can call them as
+  `extensions.mcp__revenuecat__<tool>(...)` / `extensions.mcp__amplitude__<tool>(...)`
+  without changing Fabric configuration.
+- Existing `mcp-remote` credentials are not imported. Sign in again inside the
+  enabled session; Pi stores its tokens in `~/.pi/agent/mcp-auth.json`.
+- `/amplitude-status` and `/revenuecat-status` point to the native `/mcp` UI.
+  Shell `pi mcp list/login` does not load extension registrations, so use the
+  in-session commands for these flag-enabled servers.
+- A server of the same name in `mcp.json` overrides the extension. Avoid separately
+  configuring these servers if you want the flags to remain the only opt-in.
+- An extension that takes over `/mcp` disables Pi's built-in MCP in sessions.
+  Remove that conflict before using these integrations.
+
+Regression check (no remote MCP calls or credentials required):
+
+```bash
+node --test pi/agent/extensions/tests/native-mcp.test.cjs
+```
 
 The MCP extensions use upstream Git submodules and the shared Pi extension npm dependencies.
 The Dotbot installers initialize the submodules and install dependencies automatically.
