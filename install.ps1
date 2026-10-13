@@ -39,6 +39,10 @@ try {
         throw 'Node.js 22+ is required; upgrade Node and retry.'
     }
 
+    # The shared JSON/TOML config writer is also needed for Personal cleanup.
+    & npm.cmd ci --prefix "$PSScriptRoot/scripts"
+    if ($LASTEXITCODE -ne 0) { throw 'Agent configuration dependency installation failed.' }
+
     $Configure = Join-Path $PSScriptRoot 'scripts/configure-agents.mjs'
     $ProfileArgs = @('--profile', $Profile)
     if ($TunnelId) { $ProfileArgs += @('--tunnel-id', $TunnelId) }
@@ -93,7 +97,7 @@ try {
         & node "$PSScriptRoot/hindsight/smoke.mjs"
         if ($LASTEXITCODE -ne 0) { throw 'MCP configured but not connected. Check the host, run devtunnel user login as the tunnel owner, then rerun.' }
     }
-    Write-Host "Installed $Profile profile. Restart Claude Code, Cursor and Copilot; /reload Pi."
+    Write-Host "Installed $Profile profile. Restart Claude Code, Codex and Copilot; /reload Pi."
 } finally {
     $env:DOTFILES_PROFILE = $PreviousProfile
     Pop-Location

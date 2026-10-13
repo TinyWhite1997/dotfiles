@@ -4,12 +4,13 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { randomUUID } from 'node:crypto';
+import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
 import { validateConfig, readConnection } from '../hindsight/tunnel-auth.mjs';
 
 const repository = fileURLToPath(new URL('../', import.meta.url));
 export const clients = [
   { name: 'Claude Code', file: '.claude.json', extra: { type: 'stdio' } },
-  { name: 'Cursor', file: '.cursor/mcp.json', extra: {} },
+  { name: 'Codex', file: '.codex/config.toml', toml: true, extra: { startup_timeout_sec: 180, tool_timeout_sec: 180 } },
   { name: 'Copilot', file: '.copilot/mcp-config.json', extra: { type: 'local', tools: ['*'], timeout: 180000 } },
   { name: 'Pi', file: '.pi/agent/mcp.json', extra: {
     type: 'stdio', exposure: 'deferred', timeout: 180,
@@ -39,7 +40,7 @@ function managed(entry) {
     Array.isArray(entry.args) && typeof entry.args[0] === 'string' && /[/\\]hindsight[/\\]stdio\.mjs$/i.test(entry.args[0]);
 }
 
-export async function configureAgents({ profile, home = homedir(), repo = repository, tunnelId, url, check = false }) {
+export async function configureAgents({ profile, home = homedir(), codexHome = join(home, '.codex'), repo = repository, tunnelId, url, check = false }) {
   if (!['personal', 'work'].includes(profile)) throw new Error('Choose --profile work or personal.');
   if (!!tunnelId !== !!url) throw new Error('--tunnel-id and --url must be provided together.');
   if (profile === 'personal' && (tunnelId || url)) throw new Error('Personal profile must not configure a work tunnel.');
@@ -61,28 +62,37 @@ export async function configureAgents({ profile, home = homedir(), repo = reposi
   }
 
   const args = [join(resolve(repo), 'hindsight', 'stdio.mjs')];
-  for (const client of clients) {
-    const path = join(home, client.file);
+  // Cursor is cleanup-only: never register there, but remove our legacy entry.
+  for (const client of [...clients, { file: '.cursor/mcp.json', removeOnly: true }]) {
+    const path = client.toml ? join(codexHome, 'config.toml') : join(home, client.file);
     const previous = await snapshot(path);
-    if (profile === 'personal' && previous === undefined) continue;
-    const config = previous === undefined ? {} : jsonObject(previous, path);
-    if ('mcpServers' in config && (!config.mcpServers || typeof config.mcpServers !== 'object' || Array.isArray(config.mcpServers))) {
-      throw new Error(`Invalid mcpServers object; left unchanged: ${path}`);
+    const install = profile === 'work' && !client.removeOnly;
+    if (!install && previous === undefined) continue;
+    let config;
+    if (client.toml) {
+      try { config = parseToml((previous ?? '').replace(/^\uFEFF/, '')); }
+      catch { throw new Error(`Invalid TOML; left unchanged: ${path}`); }
+    } else {
+      config = previous === undefined ? {} : jsonObject(previous, path);
     }
-    config.mcpServers ??= {};
-    const existing = config.mcpServers.hindsight;
+    const key = client.toml ? 'mcp_servers' : 'mcpServers';
+    if (key in config && (!config[key] || typeof config[key] !== 'object' || Array.isArray(config[key]))) {
+      throw new Error(`Invalid ${key} object; left unchanged: ${path}`);
+    }
+    config[key] ??= {};
+    const existing = config[key].hindsight;
     if (existing !== undefined && !managed(existing)) {
-      if (profile === 'work') throw new Error(`Unrelated hindsight entry in ${path}; rename it before installing. No files changed.`);
+      if (install) throw new Error(`Unrelated hindsight entry in ${path}; rename it before installing. No files changed.`);
       messages.push(`Preserved unrelated hindsight entry in ${path}; inspect it before personal use.`);
       continue;
     }
-    if (profile === 'work') {
-      config.mcpServers.hindsight = { ...existing, command: process.execPath, args, ...client.extra };
+    if (install) {
+      config[key].hindsight = { ...existing, command: process.execPath, args, ...client.extra };
     } else {
       if (existing === undefined) continue;
-      delete config.mcpServers.hindsight;
+      delete config[key].hindsight;
     }
-    await plan(path, `${JSON.stringify(config, null, 2)}\n`);
+    await plan(path, client.toml ? stringifyToml(config) : `${JSON.stringify(config, null, 2)}\n`);
   }
 
   // Validate every input before writing anything. Close clients while installing;
@@ -109,7 +119,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     const { values } = parseArgs({ options: {
       profile: { type: 'string' }, 'tunnel-id': { type: 'string' }, url: { type: 'string' }, check: { type: 'boolean' },
     } });
-    const result = await configureAgents({ profile: values.profile, tunnelId: values['tunnel-id'], url: values.url, check: values.check });
+    const result = await configureAgents({ profile: values.profile, codexHome: process.env.CODEX_HOME || undefined, tunnelId: values['tunnel-id'], url: values.url, check: values.check });
     console.log(`${result.checked ? 'Preflight' : 'Configured'} ${result.profile}: ${result.changed.length} file(s).`);
     for (const path of result.changed) console.log(`  ${path}`);
     for (const message of result.messages) console.warn(message);

@@ -14,7 +14,11 @@ function node {
     if (($global:InstallerTestFail -eq 'preflight' -and $args -contains '--check') -or
         ($global:InstallerTestFail -eq 'smoke' -and $args[0] -like '*smoke.mjs')) { $global:LASTEXITCODE = 1 }
 }
-function npm.cmd { Record 'npm' $args; if ($global:InstallerTestFail -eq 'npm') { $global:LASTEXITCODE = 1 } }
+function npm.cmd {
+    Record 'npm' $args
+    if (($global:InstallerTestFail -eq 'npm' -and $args[2] -like '*/hindsight') -or
+        ($global:InstallerTestFail -eq 'config-deps' -and $args[2] -like '*/scripts')) { $global:LASTEXITCODE = 1 }
+}
 function devtunnel { Record 'devtunnel' $args }
 function winget { Record 'winget' $args; if ($args[0] -eq 'list') { $args[2] } }
 function fzf { Record 'fzf' $args; '0.74.4' }
@@ -33,13 +37,15 @@ $Guidance = @($global:InstallerTestCalls | Where-Object { $_.Name -eq 'python' -
 Assert ($Guidance.Count -eq 1 -and $Guidance[0].Profile -eq 'personal') 'Personal AgentsOnly must link the personal guide via Dotbot.'
 Assert (@($global:InstallerTestCalls | Where-Object { $_.Name -eq 'python' -and $_.Arguments -contains "$Repo/install.conf-win.yaml" }).Count -eq 0) 'AgentsOnly must skip common Dotbot configuration.'
 Assert ($env:DOTFILES_PROFILE -eq 'test-previous-value') 'Profile environment was not restored.'
-Assert (($global:InstallerTestCalls[1].Arguments -contains 'personal') -and ($global:InstallerTestCalls[1].Arguments -contains '--check')) 'Personal wrapper lost its profile.'
+Assert ($global:InstallerTestCalls[1].Name -eq 'npm' -and $global:InstallerTestCalls[1].Arguments[2] -eq "$Repo/scripts") 'Config dependencies must be installed before preflight, including Personal.'
+Assert (($global:InstallerTestCalls[2].Arguments -contains 'personal') -and ($global:InstallerTestCalls[2].Arguments -contains '--check')) 'Personal wrapper lost its profile.'
 Assert ((Get-Location).Path -eq $Original) 'Working directory was not restored.'
 
 Reset
 & "$Repo/install.work.ps1" -AgentsOnly -TunnelId 'test.asse' -McpUrl 'https://test-8888.asse.devtunnels.ms/mcp/shared/'
-Assert (@($global:InstallerTestCalls | Where-Object Name -eq npm).Count -eq 1) 'Work must install MCP dependencies.'
-Assert ((@($global:InstallerTestCalls | Where-Object Name -eq npm)[0].Arguments[2]) -eq "$Repo/hindsight") 'npm must receive an absolute prefix.'
+$Npm = @($global:InstallerTestCalls | Where-Object Name -eq npm)
+Assert ($Npm.Count -eq 2) 'Work must install config and MCP dependencies.'
+Assert ($Npm[0].Arguments[2] -eq "$Repo/scripts" -and $Npm[1].Arguments[2] -eq "$Repo/hindsight") 'npm must receive absolute prefixes in prerequisite order.'
 $Config = @($global:InstallerTestCalls | Where-Object { $_.Name -eq 'node' -and $_.Arguments[0] -like '*configure-agents.mjs' })
 Assert ($Config.Count -eq 2 -and $Config[0].Arguments -contains '--check') 'Work must preflight before configuring.'
 Assert ($Config[1].Arguments -contains 'test.asse') 'Work wrapper lost TunnelId.'
@@ -52,7 +58,8 @@ Reset
 $Dotbot = @($global:InstallerTestCalls | Where-Object { $_.Name -eq 'python' -and $_.Arguments[0] -like '*dotbot/bin/dotbot' })
 Assert ($Dotbot.Count -eq 2 -and $Dotbot[0].Arguments -contains '--only' -and $Dotbot[1].Arguments -contains '--only') 'Both Dotbot configurations must receive forwarded arguments.'
 Assert (@($global:InstallerTestCalls | Where-Object Name -eq winget).Count -ge 16) 'Shared package installation was skipped.'
-Assert (@($global:InstallerTestCalls | Where-Object Name -eq npm).Count -eq 0) 'Personal installer must not install Hindsight dependencies.'
+$Npm = @($global:InstallerTestCalls | Where-Object Name -eq npm)
+Assert ($Npm.Count -eq 1 -and $Npm[0].Arguments[2] -eq "$Repo/scripts") 'Personal must install only config dependencies, not Hindsight dependencies.'
 
 Reset
 & "$Repo/install.work.ps1" -AgentsOnly
@@ -60,7 +67,7 @@ $Config = @($global:InstallerTestCalls | Where-Object { $_.Name -eq 'node' -and 
 Assert ($Config.Count -eq 2 -and $Config[1].Arguments -notcontains '--tunnel-id') 'Default Work install must need no connection arguments.'
 Assert ($global:InstallerTestCalls[-1].Arguments[0] -like '*smoke.mjs') 'Default Work install must still verify connectivity.'
 
-foreach ($Failure in @('preflight', 'npm', 'git', 'dotbot', 'smoke')) {
+foreach ($Failure in @('config-deps', 'preflight', 'npm', 'git', 'dotbot', 'smoke')) {
     Reset
     $global:InstallerTestFail = $Failure
     $Threw = $false

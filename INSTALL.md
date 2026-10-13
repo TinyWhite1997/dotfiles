@@ -37,20 +37,22 @@ The Unix and MSYS2 YAML files use the same variable. Their entrypoints default i
 
 ## Work-only MCP registration
 
-MCP is deliberately **not** an entire-file symlink: `scripts/configure-agents.mjs` injects only `mcpServers.hindsight` into each existing user JSON, leaving other servers and settings intact. It no longer reads or writes instruction files. Claude Code starts normally with `claude`; no special Work launcher is needed.
+MCP is deliberately **not** an entire-file symlink: `scripts/configure-agents.mjs` merges only the Hindsight entry into existing user configuration: `mcpServers.hindsight` in JSON, or `mcp_servers.hindsight` in Codex TOML. Other servers and settings stay intact. It no longer reads or writes instruction files. Claude Code starts normally with `claude`; no special Work launcher is needed.
 
 Only the stable startup entry is persisted. It points straight to the repository's `hindsight/stdio.mjs`, which reads an optional local connection override or the shared Work default at startup. Editing adapter code, the default, or a local override needs an MCP restart, not reinstalling; changing the registered command/arguments or switching Work/Personal needs reinjection.
 
-The Work installer installs Node.js if absent, requires Node 22+, installs Dev Tunnels CLI if absent, runs `npm ci` for the existing stdio adapter, and merges **Hindsight** into these files:
+The Work installer installs Node.js if absent, requires Node 22+, runs `npm ci --prefix scripts` for the TOML-aware config writer before preflight (also for Personal cleanup), installs Dev Tunnels CLI if absent, runs `npm ci` for the existing stdio adapter, and merges **Hindsight** into these files:
 
 | Client | User/global file |
 | --- | --- |
 | Claude Code (not Claude Desktop) | `~/.claude.json` → top-level `mcpServers` |
-| Cursor | `~/.cursor/mcp.json` |
+| Codex CLI | `~/.codex/config.toml` → `mcp_servers.hindsight` (`$env:CODEX_HOME/config.toml` when set) |
 | GitHub Copilot CLI | `~/.copilot/mcp-config.json` |
 | Pi | `~/.pi/agent/mcp.json` |
 
-The agent applications themselves must be installed separately; config files can be prepared before installing them. Existing unrelated MCPs/settings and user-added Hindsight environment/tool controls are preserved. Same-name unrelated servers cause Work installation to stop rather than overwrite them. Invalid JSON and symlinked MCP configuration files are rejected before any profile files are written. Close clients while installing to avoid concurrent config writes. Existing files get a first-install `.dotfiles-backup`; treat those backups as private because configs can contain secrets. Updates use atomic per-file replacement, not a transaction across all clients; an I/O failure is reported and rerunning converges safely.
+Cursor is no longer an installation target. Both profiles remove only legacy `~/.cursor/mcp.json` Hindsight entries pointing to this dotfiles adapter; unrelated Cursor servers/settings are preserved and no new Cursor file is created. Restart Cursor after migrating if it still has the old connection open.
+
+The agent applications themselves must be installed separately; config files can be prepared before installing them. Existing unrelated MCPs/settings and user-added Hindsight environment/tool controls are preserved. Same-name unrelated servers cause Work installation to stop rather than overwrite them. Invalid JSON/TOML and symlinked MCP configuration files are rejected before any profile files are written. Close clients while installing to avoid concurrent config writes. Existing files get a first-install `.dotfiles-backup`; treat those backups as private because configs can contain secrets. Changed TOML files are reserialized: setting values are preserved, but comments/formatting are not. Updates use atomic per-file replacement, not a transaction across all clients; an I/O failure is reported and rerunning converges safely.
 
 The shared Work connection is declared once in [`hindsight/client.work.json`](hindsight/client.work.json). New work computers read it directly: **no ID/URL prompts and no generated copy of that file**. An existing `~/.hindsight/client.json` takes precedence. Optional `-TunnelId` and `-McpUrl` arguments must be supplied together and save a machine-local override. Invalid or unreadable overrides fail instead of silently falling back to another bank.
 
@@ -69,12 +71,17 @@ All work clients connect to **one existing Hindsight host**. The Work installer 
 ## Verification
 
 ```powershell
+npm ci --prefix scripts
 node --test scripts/configure-agents.test.mjs scripts/guidance.test.mjs
+# Optional: also validate the generated config with the installed Codex executable.
+$env:DOTFILES_TEST_CODEX = (Get-Command codex -CommandType Application).Source
+node --test scripts/configure-agents.test.mjs
 pwsh -NoProfile -File scripts/install.test.ps1
 npm test --prefix hindsight
 node hindsight/smoke.mjs
 pi mcp list
 copilot mcp get hindsight
+codex mcp get hindsight
 ```
 
-After installation, `/reload` and `/mcp` in Pi; restart Copilot/Claude Code/Cursor and inspect their MCP settings. Claude Code can use `claude mcp get hindsight`; Cursor's MCP panel shows the global entry and connection state. No permissions or destructive-tool auto-approval settings are changed.
+After installation, `/reload` and `/mcp` in Pi; restart Copilot/Claude Code/Codex and inspect their MCP settings. Claude Code can use `claude mcp get hindsight`; Codex can use `codex mcp get hindsight`. No permissions or destructive-tool auto-approval settings are changed.

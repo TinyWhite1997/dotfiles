@@ -6,7 +6,7 @@ Agent → stdio.mjs → HTTPS + tunnel connect token → private Dev Tunnel → 
 
 No Agency, client-side forwarding port, anonymous tunnel access, or manually copied token. Node's MCP SDK handles Streamable HTTP/SSE; `devtunnel token` only issues credentials, never opens a forwarding connection.
 
-For work/personal Windows installation and automatic registration in Pi, Copilot, Claude Code and Cursor, use [the profile installers](../INSTALL.md). The shared Work endpoint is defined in `client.work.json`; `~/.hindsight/client.json` is an optional machine-local override. No credentials are stored in the shared default.
+For work/personal Windows installation and automatic registration in Pi, Copilot, Claude Code and Codex, use [the profile installers](../INSTALL.md). The shared Work endpoint is defined in `client.work.json`; `~/.hindsight/client.json` is an optional machine-local override. No credentials are stored in the shared default.
 
 ## Host configuration
 

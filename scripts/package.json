@@ -1,0 +1,9 @@
+{
+  "name": "dotfiles-agent-config",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "dependencies": {
+    "smol-toml": "1.9.0"
+  }
+}
