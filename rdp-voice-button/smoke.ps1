@@ -32,8 +32,8 @@ public static class VoiceButtonSmoke {
     [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr hwnd, out Rect rect);
     [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr hwnd);
     [DllImport("user32.dll")] static extern int GetWindowRgn(IntPtr hwnd, IntPtr region);
-    [DllImport("gdi32.dll")] static extern IntPtr CreateEllipticRgn(int left, int top, int right, int bottom);
-    [DllImport("gdi32.dll")] static extern bool EqualRgn(IntPtr first, IntPtr second);
+    [DllImport("gdi32.dll")] static extern IntPtr CreateRectRgn(int left, int top, int right, int bottom);
+    [DllImport("user32.dll")] static extern IntPtr WindowFromPoint(Point point);
     [DllImport("gdi32.dll")] static extern bool DeleteObject(IntPtr obj);
     [DllImport("user32.dll")] static extern IntPtr GetWindowLongPtrW(IntPtr hwnd, int index);
     [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint process);
@@ -82,13 +82,19 @@ public static class VoiceButtonSmoke {
     static void Move(int x, int y) { Check(SetCursorPos(x, y), "cursor move failed"); Pump(80); }
     static Rect Bounds(IntPtr hwnd) { Rect r; Check(GetWindowRect(hwnd, out r), "window rect failed"); return r; }
     static void AssertCircle(IntPtr hwnd) {
+        Check((GetWindowLongPtrW(hwnd, -20).ToInt64() & 0x80000) != 0, "missing per-pixel alpha window style");
+        var region = CreateRectRgn(0, 0, 1, 1);
+        try { Check(GetWindowRgn(hwnd, region) == 0, "hard clipping would destroy the antialiased edge"); }
+        finally { DeleteObject(region); }
+        Pump(80); // Let the app redraw its alpha surface after a resize.
         var r = Bounds(hwnd);
-        Check(r.right - r.left == r.bottom - r.top, "button is not square before circular clipping");
-        var expected = CreateEllipticRgn(0, 0, r.right - r.left, r.bottom - r.top);
-        var actual = CreateEllipticRgn(0, 0, 1, 1);
-        try {
-            Check(GetWindowRgn(hwnd, actual) != 0 && EqualRgn(expected, actual), "window/hit region is not circular");
-        } finally { DeleteObject(expected); DeleteObject(actual); }
+        Check(r.right - r.left == r.bottom - r.top, "button surface is not square");
+        if (!IsWindowVisible(hwnd)) return;
+        Check(WindowFromPoint(new Point { x = (r.left + r.right) / 2, y = (r.top + r.bottom) / 2 }) == hwnd, "circle center must accept clicks");
+        foreach (var point in new[] {
+            new Point { x = r.left + 1, y = r.top + 1 }, new Point { x = r.right - 2, y = r.top + 1 },
+            new Point { x = r.left + 1, y = r.bottom - 2 }, new Point { x = r.right - 2, y = r.bottom - 2 }
+        }) Check(WindowFromPoint(point) != hwnd, "transparent corners must not intercept clicks");
     }
     static void AssertShortcut(int offset) {
         Check(keys.Count == offset + 4, "click " + (offset / 4 + 1) + ": expected four keyboard events, got " + (keys.Count - offset)
@@ -221,8 +227,8 @@ public static class VoiceButtonSmoke {
             }
             Pump(100);
             Check(process.WaitForExit(2500) && process.ExitCode == 0, "button did not stop cleanly");
-            if (expectHidden) return "PASS: hidden across timer refresh, circular window/resize, non-activating/topmost styles, native touch gesture policy, single instance, --stop. Interactive mouse/keyboard checks not run.";
-            return "PASS: live visibility, bottom-left/DPI, no focus theft, three right-Alt+Space clicks, orphaned/self-capture recovery, circular window/resize, drag/no-click, session notifications/timer, display clamp, single instance, --stop. Injected shortcut intercepted; no voice recording started.";
+            if (expectHidden) return "PASS: hidden across timer refresh, alpha circle/transparent corners/resize, non-activating/topmost styles, native touch gesture policy, single instance, --stop. Interactive mouse/keyboard checks not run.";
+            return "PASS: live visibility, bottom-left/DPI, no focus theft, three right-Alt+Space clicks, orphaned/self-capture recovery, alpha circle/transparent corners/resize, drag/no-click, session notifications/timer, display clamp, single instance, --stop. Injected shortcut intercepted; no voice recording started.";
         } finally {
             if (process != null) {
                 if (!process.HasExited) {

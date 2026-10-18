@@ -1,5 +1,7 @@
 #![cfg_attr(not(test), windows_subsystem = "windows")]
 
+mod appearance;
+
 use std::{cell::Cell, io, mem::size_of, ptr::null_mut};
 use windows_sys::{
     core::w,
@@ -310,45 +312,6 @@ unsafe fn refresh(hwnd: HWND, app: &App) {
     }
 }
 
-unsafe fn paint(hwnd: HWND, pressed: bool) {
-    let mut ps = PAINTSTRUCT::default();
-    let dc = BeginPaint(hwnd, &mut ps);
-    let mut rect = RECT::default();
-    GetClientRect(hwnd, &mut rect);
-    let brush = CreateSolidBrush(if pressed { 0x004c6630 } else { 0x006d923a });
-    FillRect(dc, &rect, brush);
-    DeleteObject(brush);
-    SetBkMode(dc, TRANSPARENT as i32);
-    SetTextColor(dc, 0x00ffffff);
-    let font = CreateFontW(
-        -scaled(30, GetDpiForWindow(hwnd)),
-        0,
-        0,
-        0,
-        FW_NORMAL as i32,
-        0,
-        0,
-        0,
-        DEFAULT_CHARSET as u32,
-        OUT_DEFAULT_PRECIS as u32,
-        CLIP_DEFAULT_PRECIS as u32,
-        CLEARTYPE_QUALITY as u32,
-        DEFAULT_PITCH as u32,
-        w!("Segoe MDL2 Assets"),
-    );
-    let old = SelectObject(dc, font);
-    DrawTextW(
-        dc,
-        w!("\u{e720}"), // Windows' native Microphone icon.
-        -1,
-        &mut rect,
-        DT_CENTER | DT_VCENTER | DT_SINGLELINE,
-    );
-    SelectObject(dc, old);
-    DeleteObject(font);
-    EndPaint(hwnd, &ps);
-}
-
 unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRESULT {
     if msg == WM_NCCREATE {
         let create = &*(lp as *const CREATESTRUCTW);
@@ -368,16 +331,9 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPAR
         WM_TABLET_QUERYSYSTEMGESTURESTATUS => return TABLET_DISABLE_PRESSANDHOLD as isize,
         WM_ERASEBKGND => return 1,
         WM_SIZE => {
-            let mut rect = RECT::default();
-            GetClientRect(hwnd, &mut rect);
-            // Clip the actual window (including hit testing), not only its background.
-            let region = CreateEllipticRgn(0, 0, rect.right, rect.bottom);
-            if !region.is_null() && SetWindowRgn(hwnd, region, 1) == 0 {
-                DeleteObject(region);
-            }
-            // On success Windows owns the region, including replacing/freeing the old one.
+            InvalidateRect(hwnd, std::ptr::null(), 0);
         }
-        WM_PAINT => paint(hwnd, app.press.get().is_some()),
+        WM_PAINT => appearance::paint(hwnd, app.press.get().is_some()),
         WM_LBUTTONDOWN | WM_MOUSEMOVE | WM_LBUTTONUP => {
             clicked = handle_input(hwnd, app, msg, cursor(), None);
         }
@@ -471,6 +427,7 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPAR
 
 unsafe fn run(session: u32) -> io::Result<()> {
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+    let _graphics = appearance::GraphicsRuntime::new()?;
     let instance = GetModuleHandleW(std::ptr::null());
     let class = WNDCLASSW {
         lpfnWndProc: Some(window_proc),
@@ -489,7 +446,7 @@ unsafe fn run(session: u32) -> io::Result<()> {
         locked: Cell::new(false),
     };
     let hwnd = CreateWindowExW(
-        WS_EX_TOPMOST | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW,
+        WS_EX_TOPMOST | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW | WS_EX_LAYERED,
         CLASS,
         TITLE,
         WS_POPUP,
@@ -504,6 +461,10 @@ unsafe fn run(session: u32) -> io::Result<()> {
     );
     if hwnd.is_null() {
         return Err(io::Error::last_os_error());
+    }
+    if let Err(err) = appearance::update(hwnd, false) {
+        DestroyWindow(hwnd);
+        return Err(err);
     }
     // Registration may fail early at sign-in; periodic live queries also cover reconnect races.
     WTSRegisterSessionNotification(hwnd, NOTIFY_FOR_THIS_SESSION);
