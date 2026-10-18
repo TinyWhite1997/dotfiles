@@ -164,6 +164,10 @@ public static class VoiceButtonSmoke {
 
             for (int click = 0; click < 2; click++) {
                 Move(r.left + size / 2, r.top + size / 2);
+                if (click == 1) {
+                    // Replay the observed delayed/reinjected down with no matching up.
+                    SendMessageW(button, 0x201, new IntPtr(1), IntPtr.Zero);
+                }
                 MouseButton(true); MouseButton(false); Pump(200);
                 AssertShortcut(click * 4);
                 var afterClick = GetForegroundWindow();
@@ -179,8 +183,16 @@ public static class VoiceButtonSmoke {
             Check(keys.Count == 8 && GetForegroundWindow() == target, "drag sent keys or stole focus");
 
             x = moved.left + size / 2; y = moved.top + size / 2;
-            Move(x, y); MouseButton(true); Move(x + 30, y - 30); Move(x, y); MouseButton(false);
+            Move(x, y);
+            SendMessageW(button, 0x201, new IntPtr(1), IntPtr.Zero);
+            MouseButton(true); Move(x + 30, y - 30); Move(x, y); MouseButton(false);
             Check(keys.Count == 8, "dragging back to the starting point triggered a click");
+            var returned = Bounds(button);
+            Check(returned.left == moved.left && returned.top == moved.top, "second drag did not return to its starting position");
+            // Clicking must still work after both normal and recovered drags.
+            Move(returned.left + size / 2, returned.top + size / 2);
+            MouseButton(true); MouseButton(false); Pump(200);
+            AssertShortcut(8);
 
             int session = Process.GetCurrentProcess().SessionId;
             SendMessageW(button, 0x2B1, new IntPtr(7), new IntPtr(session + 1));
@@ -209,7 +221,7 @@ public static class VoiceButtonSmoke {
             Pump(100);
             Check(process.WaitForExit(2500) && process.ExitCode == 0, "button did not stop cleanly");
             if (expectHidden) return "PASS: hidden across timer refresh, circular window/resize, non-activating/topmost styles, native touch gesture policy, single instance, --stop. Interactive mouse/keyboard checks not run.";
-            return "PASS: live visibility, bottom-left/DPI, no focus theft, two right-Alt+Space clicks, circular window/resize, drag/no-click, session notifications/timer, display clamp, single instance, --stop. Injected shortcut intercepted; no voice recording started.";
+            return "PASS: live visibility, bottom-left/DPI, no focus theft, three right-Alt+Space clicks, orphaned/self-capture recovery, circular window/resize, drag/no-click, session notifications/timer, display clamp, single instance, --stop. Injected shortcut intercepted; no voice recording started.";
         } finally {
             if (process != null) {
                 if (!process.HasExited) {

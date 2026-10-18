@@ -318,39 +318,49 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPAR
                     },
                     dragged: false,
                 }));
-                SetCapture(hwnd);
+                // Reacquiring our own capture can synchronously notify this window.
+                if GetCapture() != hwnd {
+                    SetCapture(hwnd);
+                }
                 InvalidateRect(hwnd, std::ptr::null(), 0);
             }
         }
         WM_MOUSEMOVE | WM_LBUTTONUP => {
-            if let Some(mut press) = app.press.get() {
-                let pointer = cursor();
-                if let Some(pointer) = pointer {
-                    let threshold = scaled(8, GetDpiForWindow(hwnd));
-                    if let Some(point) = press.update(pointer, threshold) {
-                        place(hwnd, Some(point), false);
-                    }
-                }
-                if msg == WM_LBUTTONUP {
-                    app.press.set(None);
+            let pending = app.press.get();
+            if msg == WM_LBUTTONUP {
+                // Always clean up, even if an earlier notification canceled Press.
+                app.press.set(None);
+                if GetCapture() == hwnd {
                     ReleaseCapture();
-                    InvalidateRect(hwnd, std::ptr::null(), 0);
-                    if !press.dragged && pointer.is_some() {
-                        // Revalidate on click, not only at the last timer tick.
-                        if !app.locked.get()
-                            && Session::query(app.session).is_some_and(|s| s.eligible())
-                        {
-                            send_shortcut();
-                        }
-                    }
-                } else {
+                }
+                InvalidateRect(hwnd, std::ptr::null(), 0);
+            }
+            if let Some(mut press) = pending {
+                let pointer = cursor();
+                let movement =
+                    pointer.and_then(|point| press.update(point, scaled(8, GetDpiForWindow(hwnd))));
+                if msg == WM_MOUSEMOVE {
+                    // Commit before SetWindowPos: a reentrant capture-loss callback
+                    // must not be undone when this handler resumes.
                     app.press.set(Some(press));
+                }
+                if let Some(point) = movement {
+                    place(hwnd, Some(point), false);
+                }
+                if msg == WM_LBUTTONUP && !press.dragged && pointer.is_some() {
+                    // Revalidate on click, not only at the last timer tick.
+                    if !app.locked.get()
+                        && Session::query(app.session).is_some_and(|s| s.eligible())
+                    {
+                        send_shortcut();
+                    }
                 }
             }
         }
+        WM_CAPTURECHANGED if lp == hwnd as isize => {}
         WM_CAPTURECHANGED | WM_CANCELMODE => {
             app.press.set(None);
-            if msg == WM_CANCELMODE {
+            if msg == WM_CANCELMODE && GetCapture() == hwnd {
                 ReleaseCapture();
             }
             InvalidateRect(hwnd, std::ptr::null(), 0);
@@ -585,7 +595,7 @@ mod tests {
     }
 
     #[test]
-    fn mouse_and_touch_do_not_activate() {
+    fn window_activation_and_capture_state() {
         // Windows rejects cross-process WM_POINTERACTIVATE without a real pointer ID
         // (ERROR_INVALID_PARAMETER). Exercise our callback in-process instead.
         unsafe {
@@ -614,7 +624,30 @@ mod tests {
             let mouse = window_proc(hwnd, WM_MOUSEACTIVATE, 0, 0);
             let touch = window_proc(hwnd, WM_POINTERACTIVATE, 0, 0);
             let gestures = window_proc(hwnd, WM_TABLET_QUERYSYSTEMGESTURESTATUS, 0, 0);
+            // Replay the trace: capture is already ours when a fresh down arrives.
+            app.press.set(Some(Press {
+                pointer: Position { x: 0, y: 0 },
+                origin: Position { x: 0, y: 0 },
+                dragged: false,
+            }));
+            SetCapture(hwnd);
+            let captured = GetCapture() == hwnd;
+            window_proc(hwnd, WM_CAPTURECHANGED, 0, hwnd as isize);
+            let kept_press = app.press.get().is_some();
+            window_proc(hwnd, WM_CAPTURECHANGED, 0, 0);
+            let cleared_on_loss = app.press.get().is_none();
+            // An up must clean up capture even if a reentrant notification cleared Press.
+            window_proc(hwnd, WM_LBUTTONUP, 0, 0);
+            let released_on_up = GetCapture() != hwnd;
+            ReleaseCapture();
             DestroyWindow(hwnd);
+            assert!(captured, "test window must own capture");
+            assert!(
+                kept_press,
+                "self-capture notification must not erase the current press"
+            );
+            assert!(cleared_on_loss, "actual capture loss must cancel the press");
+            assert!(released_on_up, "mouse up must release orphaned capture");
             assert_eq!(mouse, MA_NOACTIVATE as isize);
             assert_eq!(touch, PA_NOACTIVATE as isize);
             assert_eq!(gestures, TABLET_DISABLE_PRESSANDHOLD as isize);
