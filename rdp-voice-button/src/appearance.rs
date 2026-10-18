@@ -88,7 +88,7 @@ fn pixels(size: i32, pressed: bool) -> io::Result<Vec<u32>> {
                 scale,
                 gp::MatrixOrderAppend,
             ))?;
-            let background = if pressed { 0xff30664c } else { 0xff3a926d };
+            let background = if pressed { 0xff06ad56 } else { 0xff07c160 };
             checked(gp::GdipCreateSolidFill(background, &mut brush))?;
             checked(gp::GdipFillEllipse(
                 graphics,
@@ -240,7 +240,11 @@ mod tests {
                 0xffffffff,
                 "filled capsule must be present"
             );
-            assert_eq!(at(10 * size / 64, size / 2), 0xff3a926d);
+            assert_eq!(at(10 * size / 64, size / 2), 0xff07c160);
+            assert_eq!(
+                pressed[((size / 2) * size + 10 * size / 64) as usize],
+                0xff06ad56
+            );
             assert_ne!(normal, pressed, "pressed feedback must remain visible");
             for (&a, &b) in normal.iter().zip(&pressed) {
                 let alpha = a >> 24;
