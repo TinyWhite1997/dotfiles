@@ -60,6 +60,7 @@ fn pixels(size: i32, pressed: bool) -> io::Result<Vec<u32>> {
         let mut image = null_mut();
         let mut graphics = null_mut();
         let mut brush = null_mut();
+        let mut gradient = null_mut();
         let mut pen = null_mut();
         let mut path = null_mut();
         // Keep cleanup outside the fallible drawing closure, including partial creation.
@@ -88,17 +89,65 @@ fn pixels(size: i32, pressed: bool) -> io::Result<Vec<u32>> {
                 scale,
                 gp::MatrixOrderAppend,
             ))?;
-            let background = if pressed { 0xff06ad56 } else { 0xff07c160 };
-            checked(gp::GdipCreateSolidFill(background, &mut brush))?;
+            checked(gp::GdipCreateSolidFill(0, &mut brush))?;
+            // Static soft shadow, kept inside the existing 64-DIP surface.
+            // No backdrop capture, animation, or live acrylic blur is needed.
+            for (radius, alpha) in [(30.0, 4u32), (29.0, 5), (28.0, 7), (27.0, 9), (26.0, 11)] {
+                checked(gp::GdipSetSolidFillColor(brush, (alpha << 24) | 0x00152f27))?;
+                checked(gp::GdipFillEllipse(
+                    graphics,
+                    brush.cast(),
+                    32.0 - radius,
+                    33.0 - radius,
+                    radius * 2.0,
+                    radius * 2.0,
+                ))?;
+            }
+            // A fine translucent rim catches the light above a muted jade face.
+            checked(gp::GdipCreateLineBrush(
+                &gp::PointF { X: 16.0, Y: 2.0 },
+                &gp::PointF { X: 48.0, Y: 58.0 },
+                0xa6ffffff,
+                0x18ffffff,
+                gp::WrapModeTileFlipXY,
+                &mut gradient,
+            ))?;
             checked(gp::GdipFillEllipse(
                 graphics,
-                brush.cast(),
-                0.5,
-                0.5,
-                63.0,
-                63.0,
+                gradient.cast(),
+                4.0,
+                2.0,
+                56.0,
+                56.0,
+            ))?;
+            let (top, bottom) = if pressed {
+                (0xff56b293, 0xff298967)
+            } else {
+                (0xff6ac9aa, 0xff2f9d78)
+            };
+            checked(gp::GdipSetLineColors(gradient, top, bottom))?;
+            checked(gp::GdipFillEllipse(
+                graphics,
+                gradient.cast(),
+                4.8,
+                2.8,
+                54.4,
+                54.4,
             ))?;
 
+            // Give the icon a little more breathing room and center it on the raised face.
+            checked(gp::GdipTranslateWorldTransform(
+                graphics,
+                3.2,
+                1.2,
+                gp::MatrixOrderPrepend,
+            ))?;
+            checked(gp::GdipScaleWorldTransform(
+                graphics,
+                0.9,
+                0.9,
+                gp::MatrixOrderPrepend,
+            ))?;
             // Rounded microphone: a capsule, a U-shaped cradle, and round-ended stand.
             checked(gp::GdipSetSolidFillColor(brush, 0xffffffff))?;
             checked(gp::GdipCreatePath(gp::FillModeAlternate, &mut path))?;
@@ -128,6 +177,9 @@ fn pixels(size: i32, pressed: bool) -> io::Result<Vec<u32>> {
         }
         if !brush.is_null() {
             gp::GdipDeleteBrush(brush.cast());
+        }
+        if !gradient.is_null() {
+            gp::GdipDeleteBrush(gradient.cast());
         }
         if !graphics.is_null() {
             gp::GdipDeleteGraphics(graphics);
@@ -240,10 +292,25 @@ mod tests {
                 0xffffffff,
                 "filled capsule must be present"
             );
-            assert_eq!(at(10 * size / 64, size / 2), 0xff07c160);
-            assert_eq!(
-                pressed[((size / 2) * size + 10 * size / 64) as usize],
-                0xff06ad56
+            let upper = at(18 * size / 64, 14 * size / 64);
+            let lower = at(18 * size / 64, 44 * size / 64);
+            let pressed_upper = pressed[((14 * size / 64) * size + 18 * size / 64) as usize];
+            assert_eq!(upper >> 24, 255);
+            assert_eq!(lower >> 24, 255);
+            for shift in [0, 8, 16] {
+                assert!(
+                    ((upper >> shift) & 255) > ((lower >> shift) & 255),
+                    "the face must have a light-to-dark gradient"
+                );
+                assert!(
+                    ((upper >> shift) & 255) > ((pressed_upper >> shift) & 255),
+                    "pressed face must be slightly darker"
+                );
+            }
+            let shadow_alpha = at(size / 2, 61 * size / 64) >> 24;
+            assert!(
+                (1..64).contains(&shadow_alpha),
+                "shadow should be soft, not an opaque border"
             );
             assert_ne!(normal, pressed, "pressed feedback must remain visible");
             for (&a, &b) in normal.iter().zip(&pressed) {
