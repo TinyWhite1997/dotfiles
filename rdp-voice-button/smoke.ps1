@@ -28,12 +28,13 @@ public static class VoiceButtonSmoke {
     static readonly HookProc callback = OnKey;
 
     [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern IntPtr FindWindow(string cls, string title);
-    [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern IntPtr CreateWindowEx(uint ex, string cls, string title, uint style, int x, int y, int w, int h, IntPtr parent, IntPtr menu, IntPtr instance, IntPtr param);
-    [DllImport("user32.dll")] static extern bool DestroyWindow(IntPtr hwnd);
-    [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr hwnd);
     [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr hwnd, out Rect rect);
     [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr hwnd);
+    [DllImport("user32.dll")] static extern int GetWindowRgn(IntPtr hwnd, IntPtr region);
+    [DllImport("gdi32.dll")] static extern IntPtr CreateEllipticRgn(int left, int top, int right, int bottom);
+    [DllImport("gdi32.dll")] static extern bool EqualRgn(IntPtr first, IntPtr second);
+    [DllImport("gdi32.dll")] static extern bool DeleteObject(IntPtr obj);
     [DllImport("user32.dll")] static extern IntPtr GetWindowLongPtrW(IntPtr hwnd, int index);
     [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint process);
     [DllImport("user32.dll")] static extern uint GetDpiForWindow(IntPtr hwnd);
@@ -66,7 +67,7 @@ public static class VoiceButtonSmoke {
     static IntPtr OnKey(int code, IntPtr wp, IntPtr lp) {
         if (code >= 0) {
             var key = Marshal.PtrToStructure<HookKey>(lp);
-            if ((key.flags & 0x10) != 0 && (key.vk == 0xA5 || key.vk == 0x0D)) {
+            if ((key.flags & 0x10) != 0 && (key.vk == 0xA5 || key.vk == 0x20)) {
                 keys.Add(key);
                 return new IntPtr(1); // Consume ONLY the injected shortcut; never start the IME.
             }
@@ -80,10 +81,19 @@ public static class VoiceButtonSmoke {
     }
     static void Move(int x, int y) { Check(SetCursorPos(x, y), "cursor move failed"); Pump(80); }
     static Rect Bounds(IntPtr hwnd) { Rect r; Check(GetWindowRect(hwnd, out r), "window rect failed"); return r; }
+    static void AssertCircle(IntPtr hwnd) {
+        var r = Bounds(hwnd);
+        Check(r.right - r.left == r.bottom - r.top, "button is not square before circular clipping");
+        var expected = CreateEllipticRgn(0, 0, r.right - r.left, r.bottom - r.top);
+        var actual = CreateEllipticRgn(0, 0, 1, 1);
+        try {
+            Check(GetWindowRgn(hwnd, actual) != 0 && EqualRgn(expected, actual), "window/hit region is not circular");
+        } finally { DeleteObject(expected); DeleteObject(actual); }
+    }
     static void AssertShortcut(int offset) {
         Check(keys.Count == offset + 4, "expected exactly four keyboard events, got " + (keys.Count - offset));
-        uint[] vk = { 0xA5, 0x0D, 0x0D, 0xA5 };
-        uint[] scan = { 0x38, 0x1C, 0x1C, 0x38 };
+        uint[] vk = { 0xA5, 0x20, 0x20, 0xA5 };
+        uint[] scan = { 0x38, 0x39, 0x39, 0x38 };
         uint[] flags = { 1, 0, 0x80, 0x81 };
         for (int i = 0; i < 4; i++) {
             var k = keys[offset + i];
@@ -101,9 +111,10 @@ public static class VoiceButtonSmoke {
         keys.Clear();
         try {
             if (!expectHidden) {
-            target = CreateWindowEx(0, "STATIC", "Voice button test - no recording", 0x10CF0000, 100, 120, 280, 180, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
-            Check(target != IntPtr.Zero && SetForegroundWindow(target), "cannot focus the isolated test window");
-            Pump(150);
+            // No test window needs focus: the hook consumes every injected shortcut key.
+            // This also works when Windows refuses background-process foreground activation.
+            target = foreground;
+            Check(target != IntPtr.Zero, "no foreground window; requires an interactive desktop");
             hook = SetWindowsHookExW(13, callback, GetModuleHandle(null), 0);
             Check(hook != IntPtr.Zero, "keyboard interception unavailable; refusing to send shortcut");
             }
@@ -123,6 +134,13 @@ public static class VoiceButtonSmoke {
             }
             uint owner; GetWindowThreadProcessId(button, out owner);
             Check(owner == process.Id, "unexpected window owner");
+            AssertCircle(button);
+            var original = Bounds(button);
+            int originalSize = original.right - original.left;
+            SetWindowPos(button, new IntPtr(-1), 0, 0, originalSize * 2, originalSize * 2, 0x12);
+            AssertCircle(button);
+            SetWindowPos(button, new IntPtr(-1), 0, 0, originalSize, originalSize, 0x12);
+            AssertCircle(button);
             long style = GetWindowLongPtrW(button, -20).ToInt64();
             Check((style & 0x08000088) == 0x08000088, "missing NOACTIVATE/TOOLWINDOW/TOPMOST styles");
             Check(SendMessageW(button, 0x21, IntPtr.Zero, IntPtr.Zero).ToInt64() == 3, "mouse activation was not rejected");
@@ -142,7 +160,9 @@ public static class VoiceButtonSmoke {
                 Move(r.left + size / 2, r.top + size / 2);
                 MouseButton(true); MouseButton(false); Pump(200);
                 AssertShortcut(click * 4);
-                Check(GetForegroundWindow() == target, "click stole foreground focus");
+                var afterClick = GetForegroundWindow();
+                uint foregroundPid; GetWindowThreadProcessId(afterClick, out foregroundPid);
+                Check(afterClick == target, "click changed foreground: before=" + target + ", after=" + afterClick + ", button=" + button + ", foreground pid=" + foregroundPid);
             }
             int x = r.left + size / 2, y = r.top + size / 2;
             Move(x, y); MouseButton(true); Pump(550);
@@ -182,8 +202,8 @@ public static class VoiceButtonSmoke {
             }
             Pump(100);
             Check(process.WaitForExit(2500) && process.ExitCode == 0, "button did not stop cleanly");
-            if (expectHidden) return "PASS: hidden across timer refresh, non-activating/topmost styles, native touch gesture policy, single instance, --stop. Interactive mouse/keyboard checks not run.";
-            return "PASS: live visibility, bottom-left/DPI, no focus theft, two right-Alt+Enter clicks, drag/no-click, session notifications/timer, display clamp, single instance, --stop. Injected shortcut intercepted; no voice recording started.";
+            if (expectHidden) return "PASS: hidden across timer refresh, circular window/resize, non-activating/topmost styles, native touch gesture policy, single instance, --stop. Interactive mouse/keyboard checks not run.";
+            return "PASS: live visibility, bottom-left/DPI, no focus theft, two right-Alt+Space clicks, circular window/resize, drag/no-click, session notifications/timer, display clamp, single instance, --stop. Injected shortcut intercepted; no voice recording started.";
         } finally {
             if (process != null) {
                 if (!process.HasExited) {
@@ -195,10 +215,8 @@ public static class VoiceButtonSmoke {
                 process.Dispose();
             }
             if (hook != IntPtr.Zero) UnhookWindowsHookEx(hook);
-            if (target != IntPtr.Zero) DestroyWindow(target);
             if (!expectHidden) {
                 SetCursorPos(cursor.x, cursor.y);
-                if (foreground != IntPtr.Zero) SetForegroundWindow(foreground);
             }
         }
     }

@@ -20,7 +20,7 @@ use windows_sys::{
 };
 
 const CLASS: *const u16 = w!("RdpVoiceButton");
-const TITLE: *const u16 = w!("语音 · 右 Alt + Enter");
+const TITLE: *const u16 = w!("语音 · 右 Alt + Space");
 const REFRESH_TIMER: usize = 1;
 
 #[derive(Debug)]
@@ -127,18 +127,18 @@ fn shortcut() -> [INPUT; 4] {
             },
         }
     }
-    // E0 38 is RIGHT Alt; plain 1C is the main Enter, not keypad Enter.
+    // E0 38 is RIGHT Alt; 39 is Space.
     [
         key(0x38, KEYEVENTF_EXTENDEDKEY),
-        key(0x1c, 0),
-        key(0x1c, KEYEVENTF_KEYUP),
+        key(0x39, 0),
+        key(0x39, KEYEVENTF_KEYUP),
         key(0x38, KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP),
     ]
 }
 
 unsafe fn send_shortcut() {
-    // Do not turn a held Ctrl/Shift/Win/Alt/Enter into an unintended shortcut.
-    if [VK_CONTROL, VK_SHIFT, VK_LWIN, VK_RWIN, VK_MENU, VK_RETURN]
+    // Do not turn a held Ctrl/Shift/Win/Alt/Space into an unintended shortcut.
+    if [VK_CONTROL, VK_SHIFT, VK_LWIN, VK_RWIN, VK_MENU, VK_SPACE]
         .iter()
         .any(|key| GetAsyncKeyState(*key as i32) < 0)
     {
@@ -247,11 +247,11 @@ unsafe fn paint(hwnd: HWND, pressed: bool) {
     SetBkMode(dc, TRANSPARENT as i32);
     SetTextColor(dc, 0x00ffffff);
     let font = CreateFontW(
-        -scaled(18, GetDpiForWindow(hwnd)),
+        -scaled(30, GetDpiForWindow(hwnd)),
         0,
         0,
         0,
-        FW_MEDIUM as i32,
+        FW_NORMAL as i32,
         0,
         0,
         0,
@@ -260,12 +260,12 @@ unsafe fn paint(hwnd: HWND, pressed: bool) {
         CLIP_DEFAULT_PRECIS as u32,
         CLEARTYPE_QUALITY as u32,
         DEFAULT_PITCH as u32,
-        w!("Microsoft YaHei UI"),
+        w!("Segoe MDL2 Assets"),
     );
     let old = SelectObject(dc, font);
     DrawTextW(
         dc,
-        w!("语音"),
+        w!("\u{e720}"), // Windows' native Microphone icon.
         -1,
         &mut rect,
         DT_CENTER | DT_VCENTER | DT_SINGLELINE,
@@ -292,6 +292,16 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPAR
         // Keep native touch press-and-drag from becoming a Windows right-click.
         WM_TABLET_QUERYSYSTEMGESTURESTATUS => return TABLET_DISABLE_PRESSANDHOLD as isize,
         WM_ERASEBKGND => return 1,
+        WM_SIZE => {
+            let mut rect = RECT::default();
+            GetClientRect(hwnd, &mut rect);
+            // Clip the actual window (including hit testing), not only its background.
+            let region = CreateEllipticRgn(0, 0, rect.right, rect.bottom);
+            if !region.is_null() && SetWindowRgn(hwnd, region, 1) == 0 {
+                DeleteObject(region);
+            }
+            // On success Windows owns the region, including replacing/freeing the old one.
+        }
         WM_PAINT => paint(hwnd, app.press.get().is_some()),
         WM_LBUTTONDOWN => {
             if let Some(pointer) = cursor() {
@@ -561,9 +571,9 @@ mod tests {
     }
 
     #[test]
-    fn right_alt_enter_down_and_up() {
+    fn right_alt_space_down_and_up() {
         let inputs = shortcut();
-        let expected = [(0x38, 9), (0x1c, 8), (0x1c, 10), (0x38, 11)];
+        let expected = [(0x38, 9), (0x39, 8), (0x39, 10), (0x38, 11)];
         for (input, (scan, flags)) in inputs.iter().zip(expected) {
             assert_eq!(input.r#type, INPUT_KEYBOARD);
             let key = unsafe { input.Anonymous.ki };
