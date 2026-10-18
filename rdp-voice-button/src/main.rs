@@ -12,7 +12,7 @@ use windows_sys::{
         },
         UI::{
             HiDpi::*,
-            Input::KeyboardAndMouse::*,
+            Input::{KeyboardAndMouse::*, Pointer::*},
             TabletPC::{TABLET_DISABLE_PRESSANDHOLD, WM_TABLET_QUERYSYSTEMGESTURESTATUS},
             WindowsAndMessaging::*,
         },
@@ -89,6 +89,7 @@ impl Position {
 
 #[derive(Clone, Copy)]
 struct Press {
+    contact: Option<u32>, // None = mouse; Some(id) = the active native touch/pen.
     pointer: Position,
     origin: Position,
     dragged: bool,
@@ -221,8 +222,78 @@ unsafe fn place(hwnd: HWND, requested: Option<Position>, initial: bool) {
     );
 }
 
+// Both real mouse input and native touch use the same click/drag decision.
+// Native contact IDs keep delayed compatibility mouse events from resetting a touch.
+unsafe fn handle_input(
+    hwnd: HWND,
+    app: &App,
+    phase: u32,
+    pointer: Option<Position>,
+    contact: Option<u32>,
+) -> bool {
+    if contact.is_none() && app.press.get().is_some_and(|p| p.contact.is_some()) {
+        return false;
+    }
+    if phase == WM_LBUTTONDOWN {
+        if let Some(pointer) = pointer {
+            if contact.is_some() && GetCapture() == hwnd {
+                app.press.set(None);
+                ReleaseCapture(); // Drop any stale mouse capture before a new native contact.
+            }
+            let mut rect = RECT::default();
+            GetWindowRect(hwnd, &mut rect);
+            app.press.set(Some(Press {
+                contact,
+                pointer,
+                origin: Position {
+                    x: rect.left,
+                    y: rect.top,
+                },
+                dragged: false,
+            }));
+            if contact.is_none() && GetCapture() != hwnd {
+                SetCapture(hwnd);
+            }
+            // Touch has implicit per-pointer capture; never use mouse SetCapture for it.
+            InvalidateRect(hwnd, std::ptr::null(), 0);
+        }
+        return false;
+    }
+    let pending = app.press.get();
+    if pending.is_some_and(|p| p.contact != contact) {
+        return false;
+    }
+    if phase == WM_LBUTTONUP {
+        app.press.set(None);
+        if contact.is_none() && GetCapture() == hwnd {
+            ReleaseCapture();
+        }
+        InvalidateRect(hwnd, std::ptr::null(), 0);
+    }
+    if let Some(mut press) = pending {
+        let movement =
+            pointer.and_then(|point| press.update(point, scaled(8, GetDpiForWindow(hwnd))));
+        if phase == WM_MOUSEMOVE {
+            app.press.set(Some(press)); // Commit before any reentrant SetWindowPos calls.
+        }
+        if let Some(point) = movement {
+            place(hwnd, Some(point), false);
+        }
+        return phase == WM_LBUTTONUP && !press.dragged && pointer.is_some();
+    }
+    false
+}
+
+unsafe fn cancel_contact(hwnd: HWND, app: &App, id: u32) {
+    if app.press.get().is_some_and(|p| p.contact == Some(id)) {
+        app.press.set(None);
+        InvalidateRect(hwnd, std::ptr::null(), 0);
+    }
+}
+
 unsafe fn hide(hwnd: HWND, app: &App) {
-    if app.press.take().is_some() {
+    app.press.set(None);
+    if GetCapture() == hwnd {
         ReleaseCapture();
     }
     ShowWindow(hwnd, SW_HIDE);
@@ -289,6 +360,7 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPAR
     }
     // App is owned by run() and outlives this window and its message loop.
     let app = &*ptr;
+    let mut clicked = false;
     match msg {
         WM_MOUSEACTIVATE => return MA_NOACTIVATE as isize,
         WM_POINTERACTIVATE => return PA_NOACTIVATE as isize,
@@ -306,58 +378,47 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPAR
             // On success Windows owns the region, including replacing/freeing the old one.
         }
         WM_PAINT => paint(hwnd, app.press.get().is_some()),
-        WM_LBUTTONDOWN => {
-            if let Some(pointer) = cursor() {
-                let mut rect = RECT::default();
-                GetWindowRect(hwnd, &mut rect);
-                app.press.set(Some(Press {
-                    pointer,
-                    origin: Position {
-                        x: rect.left,
-                        y: rect.top,
-                    },
-                    dragged: false,
-                }));
-                // Reacquiring our own capture can synchronously notify this window.
-                if GetCapture() != hwnd {
-                    SetCapture(hwnd);
-                }
-                InvalidateRect(hwnd, std::ptr::null(), 0);
-            }
+        WM_LBUTTONDOWN | WM_MOUSEMOVE | WM_LBUTTONUP => {
+            clicked = handle_input(hwnd, app, msg, cursor(), None);
         }
-        WM_MOUSEMOVE | WM_LBUTTONUP => {
-            let pending = app.press.get();
-            if msg == WM_LBUTTONUP {
-                // Always clean up, even if an earlier notification canceled Press.
-                app.press.set(None);
-                if GetCapture() == hwnd {
-                    ReleaseCapture();
-                }
-                InvalidateRect(hwnd, std::ptr::null(), 0);
+        WM_POINTERDOWN | WM_POINTERUPDATE | WM_POINTERUP => {
+            let id = (wp & 0xffff) as u32;
+            let mut info = POINTER_INFO::default();
+            if GetPointerInfo(id, &mut info) == 0 {
+                cancel_contact(hwnd, app, id);
+                return 0;
             }
-            if let Some(mut press) = pending {
-                let pointer = cursor();
-                let movement =
-                    pointer.and_then(|point| press.update(point, scaled(8, GetDpiForWindow(hwnd))));
-                if msg == WM_MOUSEMOVE {
-                    // Commit before SetWindowPos: a reentrant capture-loss callback
-                    // must not be undone when this handler resumes.
-                    app.press.set(Some(press));
-                }
-                if let Some(point) = movement {
-                    place(hwnd, Some(point), false);
-                }
-                if msg == WM_LBUTTONUP && !press.dragged && pointer.is_some() {
-                    // Revalidate on click, not only at the last timer tick.
-                    if !app.locked.get()
-                        && Session::query(app.session).is_some_and(|s| s.eligible())
-                    {
-                        send_shortcut();
-                    }
-                }
+            if info.pointerType == PT_MOUSE {
+                return DefWindowProcW(hwnd, msg, wp, lp);
             }
+            if info.pointerFlags & POINTER_FLAG_CANCELED != 0 {
+                cancel_contact(hwnd, app, id);
+                return 0;
+            }
+            if info.pointerFlags & POINTER_FLAG_PRIMARY == 0 {
+                return 0; // Only the primary finger drives this one button.
+            }
+            let phase = match msg {
+                WM_POINTERDOWN => WM_LBUTTONDOWN,
+                WM_POINTERUP => WM_LBUTTONUP,
+                _ => WM_MOUSEMOVE,
+            };
+            clicked = handle_input(
+                hwnd,
+                app,
+                phase,
+                Some(Position {
+                    x: info.ptPixelLocation.x,
+                    y: info.ptPixelLocation.y,
+                }),
+                Some(id),
+            );
+            // Consume the native sequence: do not ask DefWindowProc to synthesize
+            // mouse down/up, which IME hooks can delay or reorder.
         }
-        WM_CAPTURECHANGED if lp == hwnd as isize => {}
+        WM_POINTERCAPTURECHANGED => cancel_contact(hwnd, app, (wp & 0xffff) as u32),
+        WM_CAPTURECHANGED
+            if lp == hwnd as isize || app.press.get().is_some_and(|p| p.contact.is_some()) => {}
         WM_CAPTURECHANGED | WM_CANCELMODE => {
             app.press.set(None);
             if msg == WM_CANCELMODE && GetCapture() == hwnd {
@@ -401,6 +462,9 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPAR
             PostQuitMessage(0);
         }
         _ => return DefWindowProcW(hwnd, msg, wp, lp),
+    }
+    if clicked && !app.locked.get() && Session::query(app.session).is_some_and(|s| s.eligible()) {
+        send_shortcut();
     }
     0
 }
@@ -545,6 +609,7 @@ mod tests {
     #[test]
     fn drag_threshold_latches_and_clamps() {
         let mut press = Press {
+            contact: None,
             pointer: Position { x: 20, y: 30 },
             origin: Position { x: 16, y: 100 },
             dragged: false,
@@ -626,6 +691,7 @@ mod tests {
             let gestures = window_proc(hwnd, WM_TABLET_QUERYSYSTEMGESTURESTATUS, 0, 0);
             // Replay the trace: capture is already ours when a fresh down arrives.
             app.press.set(Some(Press {
+                contact: None,
                 pointer: Position { x: 0, y: 0 },
                 origin: Position { x: 0, y: 0 },
                 dragged: false,
@@ -639,6 +705,46 @@ mod tests {
             // An up must clean up capture even if a reentrant notification cleared Press.
             window_proc(hwnd, WM_LBUTTONUP, 0, 0);
             let released_on_up = GetCapture() != hwnd;
+
+            // Replay the real trace's reordered compatibility up/down around a native tap.
+            let point = Some(Position { x: 20, y: 20 });
+            for id in 1..=3 {
+                assert!(!handle_input(hwnd, &app, WM_LBUTTONDOWN, point, Some(id)));
+                assert!(!handle_input(hwnd, &app, WM_LBUTTONUP, point, None));
+                assert!(!handle_input(hwnd, &app, WM_LBUTTONDOWN, point, None));
+                window_proc(hwnd, WM_CAPTURECHANGED, 0, 0);
+                assert!(
+                    handle_input(hwnd, &app, WM_LBUTTONUP, point, Some(id)),
+                    "each native tap must produce exactly one click despite mouse reordering"
+                );
+                assert!(!handle_input(hwnd, &app, WM_LBUTTONUP, point, Some(id)));
+                // A late mouse down with no up must not poison the next native contact.
+                assert!(!handle_input(hwnd, &app, WM_LBUTTONDOWN, point, None));
+            }
+            for id in 4..=5 {
+                handle_input(hwnd, &app, WM_LBUTTONDOWN, point, Some(id));
+                assert!(!handle_input(
+                    hwnd,
+                    &app,
+                    WM_MOUSEMOVE,
+                    Some(Position { x: 60, y: 60 }),
+                    Some(id)
+                ));
+                assert!(
+                    !handle_input(hwnd, &app, WM_LBUTTONUP, point, Some(id)),
+                    "dragging back to the origin must not become a click"
+                );
+            }
+            handle_input(hwnd, &app, WM_LBUTTONDOWN, point, Some(6));
+            cancel_contact(hwnd, &app, 7); // Losing a different contact is irrelevant.
+            assert!(app.press.get().is_some());
+            cancel_contact(hwnd, &app, 6);
+            assert!(!handle_input(hwnd, &app, WM_LBUTTONUP, point, Some(6)));
+            handle_input(hwnd, &app, WM_LBUTTONDOWN, point, Some(8));
+            assert!(
+                handle_input(hwnd, &app, WM_LBUTTONUP, point, Some(8)),
+                "a tap after a canceled touch must work immediately"
+            );
             ReleaseCapture();
             DestroyWindow(hwnd);
             assert!(captured, "test window must own capture");

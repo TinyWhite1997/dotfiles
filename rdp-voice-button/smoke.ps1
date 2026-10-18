@@ -91,7 +91,8 @@ public static class VoiceButtonSmoke {
         } finally { DeleteObject(expected); DeleteObject(actual); }
     }
     static void AssertShortcut(int offset) {
-        Check(keys.Count == offset + 4, "expected exactly four keyboard events, got " + (keys.Count - offset));
+        Check(keys.Count == offset + 4, "click " + (offset / 4 + 1) + ": expected four keyboard events, got " + (keys.Count - offset)
+            + "; button visible=" + IsWindowVisible(FindWindow("RdpVoiceButton", null)) + "; foreground=" + GetForegroundWindow());
         uint[] vk = { 0xA5, 0x20, 0x20, 0xA5 };
         uint[] scan = { 0x38, 0x39, 0x39, 0x38 };
         uint[] flags = { 1, 0, 0x80, 0x81 };

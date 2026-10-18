@@ -17,6 +17,7 @@ windows-sys = { version = "0.61.2", features = [
     "Win32_UI_HiDpi",
     "Win32_UI_TabletPC",
     "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_Input_Pointer",
     "Win32_UI_WindowsAndMessaging",
 ] }
 
