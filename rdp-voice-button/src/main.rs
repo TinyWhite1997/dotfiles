@@ -146,15 +146,18 @@ unsafe fn send_shortcut() {
         return;
     }
     let inputs = shortcut();
-    if SendInput(
-        inputs.len() as u32,
-        inputs.as_ptr(),
-        size_of::<INPUT>() as i32,
-    ) != 4
-    {
-        // Best-effort releases if injection was partial. UIPI can block elevated targets.
-        SendInput(2, inputs[2..].as_ptr(), size_of::<INPUT>() as i32);
-        MessageBeep(MB_ICONWARNING);
+    // Match the existing AHK SendEvent / SetKeyDelay 30, 50 sequence. Sending the
+    // entire chord in one batch gives the input method no stable key-down interval.
+    for (input, delay_ms) in inputs.iter().zip([30, 50, 30, 0]) {
+        if SendInput(1, input, size_of::<INPUT>() as i32) != 1 {
+            // Release any keys we already pressed if a later event cannot be sent.
+            SendInput(2, inputs[2..].as_ptr(), size_of::<INPUT>() as i32);
+            MessageBeep(MB_ICONWARNING);
+            return;
+        }
+        if delay_ms != 0 {
+            std::thread::sleep(std::time::Duration::from_millis(delay_ms));
+        }
     }
 }
 

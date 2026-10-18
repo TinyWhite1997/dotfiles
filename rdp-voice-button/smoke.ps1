@@ -98,6 +98,12 @@ public static class VoiceButtonSmoke {
         for (int i = 0; i < 4; i++) {
             var k = keys[offset + i];
             Check(k.vk == vk[i] && k.scan == scan[i] && (k.flags & 0x81) == flags[i], "wrong key/scan/extended/up event at " + i);
+            if (i > 0) {
+                // A batch of four correct events can still be too fast for the IME.
+                uint gap = unchecked(k.time - keys[offset + i - 1].time);
+                uint minimum = i == 2 ? 40u : 20u; // 30/50/30 ms, allowing timestamp quantization.
+                Check(gap >= minimum, "shortcut collapsed: gap before event " + i + " was " + gap + " ms (minimum " + minimum + ")");
+            }
         }
     }
 
