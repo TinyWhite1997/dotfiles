@@ -1,3 +1,7 @@
+- defaults:
+    shell:
+      stdout: true
+      stderr: true
 - link:
     .git/hooks/pre-commit:
       path: pi/git-pre-commit
