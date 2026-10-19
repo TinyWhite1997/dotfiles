@@ -68,7 +68,7 @@ class Transport {
     this.messages.push(message);
     const finish = this.options.args[1] === "finish-pr";
     if (message.method === "initialize") {
-      if (finish && this.mode === "handshake-held") return;
+      if ((finish && this.mode === "handshake-held") || (!finish && this.mode === "gateway-handshake-held")) return;
       if ((finish && this.mode === "handshake-error") || (!finish && this.mode === "gateway-error")) {
         this.stderr.write("backend diagnostic");
         this.receive({ id: message.id, error: { code: -32603, message: "sign-in failed" } });
@@ -79,6 +79,7 @@ class Transport {
         } });
       }
     } else if (message.method === "tools/list") {
+      if (this.mode === "gateway-list-held") return;
       this.receive({ id: message.id, result: { tools: [{
         name: "call_tool", inputSchema: { type: "object" },
       }] } });
@@ -132,7 +133,7 @@ test("Agency automatic startup and finish-pr lifecycle", async (t) => {
   });
   t.after(() => { hooks.deregister(); delete globalThis.__agencyTestTransport; });
   const initialize = (await import("../agency-mcp.ts")).default;
-  async function runtime(t, probeResult = { code: 0, killed: false }, mode = "normal") {
+  async function runtime(t, probeResult = { code: 0, killed: false }, mode = "normal", waitForReady = true) {
     Transport.mode = mode;
     const events = new Map(), tools = new Map(), commands = new Map();
     const notices = [], probes = [];
@@ -145,8 +146,9 @@ test("Agency automatic startup and finish-pr lifecycle", async (t) => {
         probes.push({ command, args, options });
         assert.equal(command, "agency");
         assert.deepEqual(args, ["--version"]);
-        assert.deepEqual(options, { timeout: 5000 });
-        return typeof probeResult === "function" ? probeResult() : probeResult;
+        assert.equal(options.timeout, 5000);
+        assert.ok(options.signal instanceof AbortSignal);
+        return typeof probeResult === "function" ? probeResult(options.signal) : probeResult;
       },
       on: (name, handler) => events.set(name, handler),
       registerTool: (tool) => tools.set(tool.name, tool),
@@ -158,11 +160,13 @@ test("Agency automatic startup and finish-pr lifecycle", async (t) => {
     const start = () => events.get("session_start")({}, ctx);
     t.after(shutdown);
     await start();
+    const ready = () => events.get("before_agent_start")({ systemPrompt: "base" });
+    if (waitForReady) await ready();
     const call = (args = {}, signal, onUpdate, overrides = {}) => tools.get("agency_call_tool").execute(
       "test", { toolset_id: "finish-pr", tool_name: "finish_pull_request", arguments: args, ...overrides },
       signal, onUpdate, ctx,
     );
-    return { call, tools, ctx, shutdown, start, notices, probes, events, commands };
+    return { call, tools, ctx, shutdown, start, ready, notices, probes, events, commands };
   }
 
   for (const result of [{ code: 1, killed: false }, { code: 2, killed: false }, { code: 0, killed: true }]) {
@@ -173,7 +177,7 @@ test("Agency automatic startup and finish-pr lifecycle", async (t) => {
       assert.equal(r.tools.size, 0);
       assert.equal(Transport.instances.length, before);
       assert.deepEqual(r.notices, []);
-      assert.equal(r.events.get("before_agent_start")({ systemPrompt: "base" }), undefined);
+      assert.equal(await r.ready(), undefined);
       await r.commands.get("agency-status").handler("", r.ctx);
       assert.match(r.notices.at(-1).message, /CLI is unavailable/);
       assert.doesNotMatch(r.notices.at(-1).message, /--agency/);
@@ -185,7 +189,7 @@ test("Agency automatic startup and finish-pr lifecycle", async (t) => {
     const r = await runtime(t);
     assert.equal(r.probes.length, 1);
     assert.ok(r.tools.has("agency_call_tool"));
-    assert.match(r.events.get("before_agent_start")({ systemPrompt: "base" }).systemPrompt, /^base\n\n## Agency/);
+    assert.match((await r.ready()).systemPrompt, /^base\n\n## Agency/);
     await r.commands.get("agency-status").handler("", r.ctx);
     assert.match(r.notices.at(-1).message, /Gateway is connected/);
     for (const overrides of [{ toolset_id: "ado" }, { tool_name: "other_tool" }, { toolset_id: "finish-pr-custom" }]) {
@@ -200,6 +204,7 @@ test("Agency automatic startup and finish-pr lifecycle", async (t) => {
     assert.equal(r.tools.size, 0);
     code = 0;
     await r.start();
+    await r.ready();
     assert.equal(r.probes.length, 2);
     assert.ok(r.tools.has("agency_call_tool"));
   });
@@ -207,13 +212,76 @@ test("Agency automatic startup and finish-pr lifecycle", async (t) => {
   await t.test("connection failure is reported, not mistaken for a missing CLI", async (t) => {
     const r = await runtime(t, { code: 0, killed: false }, "gateway-error");
     assert.equal(r.tools.size, 0);
-    assert.equal(r.events.get("before_agent_start")({ systemPrompt: "base" }), undefined);
+    assert.equal(await r.ready(), undefined);
     assert.match(r.notices.at(-1).message, /sign-in failed/);
     assert.equal(r.notices.at(-1).level, "error");
     assert.equal(Transport.instances.at(-1).closed, true);
     await r.commands.get("agency-status").handler("", r.ctx);
     assert.match(r.notices.at(-1).message, /CLI is available but/);
   });
+
+  await t.test("missing executable quietly skips startup even if the probe rejects", async (t) => {
+    const before = Transport.instances.length;
+    const r = await runtime(t, () => { throw new Error("spawn agency ENOENT"); });
+    assert.equal(Transport.instances.length, before);
+    assert.equal(r.tools.size, 0);
+    assert.deepEqual(r.notices, []);
+    assert.equal(await r.ready(), undefined);
+  });
+
+  await t.test("CLI detection runs in the background and shutdown prevents a late Gateway", async (t) => {
+    const probe = Promise.withResolvers();
+    const before = Transport.instances.length;
+    const r = await runtime(t, () => probe.promise, "normal", false);
+    assert.equal(r.tools.size, 0);
+    assert.equal(Transport.instances.length, before);
+    await r.commands.get("agency-status").handler("", r.ctx);
+    assert.match(r.notices.at(-1).message, /Checking Agency CLI/);
+    const stopping = r.shutdown();
+    assert.equal(r.probes[0].options.signal.aborted, true);
+    probe.resolve({ code: 0, killed: false });
+    await stopping;
+    assert.equal(Transport.instances.length, before, "late probe must not spawn after shutdown");
+    assert.equal(await r.ready(), undefined);
+    assert.ok(r.notices.every(notice => notice.level !== "error"));
+    await r.start();
+    await r.ready();
+    assert.ok(r.tools.has("agency_call_tool"), "a new session may start after cancellation");
+  });
+
+  for (const mode of ["gateway-handshake-held", "gateway-list-held"]) {
+    await t.test(`${mode}: UI starts immediately; the first prompt waits for all tools`, async (t) => {
+      const r = await runtime(t, { code: 0, killed: false }, mode, false);
+      await flush();
+      const gateway = Transport.instances.at(-1);
+      assert.equal(r.tools.size, 0);
+      await r.commands.get("agency-status").handler("", r.ctx);
+      assert.match(r.notices.at(-1).message, /connecting in the background/);
+      let result;
+      const pending = r.ready().then(value => { result = value; });
+      await flush();
+      assert.equal(result, undefined, "first prompt must wait for discovery");
+      const request = gateway.messages.find(m => m.method === (mode === "gateway-handshake-held" ? "initialize" : "tools/list"));
+      gateway.mode = "normal";
+      await gateway.send(request);
+      await pending;
+      assert.match(result.systemPrompt, /^base\n\n## Agency/);
+      assert.ok(r.tools.has("agency_call_tool"));
+    });
+
+    await t.test(`${mode}: shutdown cancels startup without late registration or errors`, async (t) => {
+      const r = await runtime(t, { code: 0, killed: false }, mode, false);
+      await flush();
+      const gateway = Transport.instances.at(-1);
+      const pending = r.ready();
+      await r.shutdown();
+      assert.equal(await pending, undefined);
+      assert.equal(gateway.closed, true);
+      assert.equal(r.tools.size, 0);
+      assert.deepEqual(r.notices, []);
+      await r.shutdown();
+    });
+  }
 
   for (const args of [{}, { pull_request: "123", dry_run: true, interval_seconds: 120, max_wait_seconds: 3600 }]) {
     await t.test(`heartbeats survive 180s and 30m; arguments ${JSON.stringify(args)}`, async (t) => {

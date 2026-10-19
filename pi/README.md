@@ -183,13 +183,15 @@ pi
 ```
 
 At session startup, the extension checks `agency --version` with a five-second
-timeout. If the CLI is available on PATH and runs successfully, it connects to
-Agency's MCP Gateway automatically; no startup flag is needed. If the CLI is
-missing, fails the check, or times out, it silently skips MCP startup without
-registering Agency tools or injecting its system-prompt guidance. Gateway
-connection errors after a successful check are still reported.
+timeout and connects to Agency's MCP Gateway in the background, so neither step
+blocks the UI; no startup flag is needed. If the CLI is missing, fails the check,
+or times out, it silently skips MCP startup without registering Agency tools or
+injecting its system-prompt guidance. Gateway connection errors after a successful
+check are still reported. An immediate first prompt waits for background startup
+before reaching the model, so its Agency tools and guidance are not missed.
+Shutdown/reload cancels pending detection/connection and closes the Gateway.
 
-Use `/agency-status` to inspect availability/connection state. After installing
+Use `/agency-status` to inspect detection, connection, and availability state. After installing
 Agency or changing PATH, restart Pi (or `/reload` if this process already has the
 updated PATH).
 

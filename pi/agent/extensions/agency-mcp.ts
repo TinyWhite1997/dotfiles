@@ -127,6 +127,8 @@ export default function agencyMcpExtension(pi: ExtensionAPI) {
   const finishPrClients = new Set<Client>();
 
   let cliAvailable = false;
+  let startupController: AbortController | undefined;
+  let startupPromise: Promise<void> | undefined;
 
   const closeClient = async () => {
     const currentClient = client;
@@ -222,7 +224,7 @@ export default function agencyMcpExtension(pi: ExtensionAPI) {
       notify(message: string, level?: "info" | "warning" | "error"): void;
       setStatus(key: string, value: string | undefined): void;
     };
-  }) => {
+  }, signal: AbortSignal) => {
     if (client) return;
     if (connectPromise) return connectPromise;
 
@@ -247,10 +249,11 @@ export default function agencyMcpExtension(pi: ExtensionAPI) {
       );
 
       try {
-        await nextClient.connect(nextTransport);
         client = nextClient;
+        await nextClient.connect(nextTransport, { signal });
 
-        const response = await nextClient.listTools();
+        const response = await nextClient.listTools(undefined, { signal });
+        signal.throwIfAborted();
         const tools = response.tools as McpTool[];
         for (const tool of tools) {
           pi.registerTool({
@@ -318,29 +321,59 @@ export default function agencyMcpExtension(pi: ExtensionAPI) {
     }
   };
 
-  pi.on("session_start", async (_event, ctx) => {
+  pi.on("session_start", (_event, ctx) => {
+    if (startupPromise) return;
     cliAvailable = false;
-    try {
-      // Probe before starting a Gateway; machines without Agency stay quiet.
-      const probe = await pi.exec("agency", ["--version"], { timeout: 5_000 });
-      cliAvailable = probe.code === 0 && !probe.killed;
-      if (!cliAvailable) return;
-      await connect(ctx);
-    } catch (error) {
-      ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
-    }
+    const controller = new AbortController();
+    startupController = controller;
+    // Neither CLI detection nor the Gateway handshake should hold up the UI.
+    startupPromise = (async () => {
+      try {
+        // Probe before starting a Gateway; machines without Agency stay quiet.
+        const probe = await pi.exec("agency", ["--version"], {
+          timeout: 5_000,
+          signal: controller.signal,
+        });
+        if (controller.signal.aborted) return;
+        cliAvailable = probe.code === 0 && !probe.killed;
+      } catch {
+        return;
+      }
+      if (cliAvailable) await connect(ctx, controller.signal);
+    })().catch((error) => {
+      if (!controller.signal.aborted) {
+        ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
+      }
+    }).finally(() => {
+      startupPromise = undefined;
+    });
   });
 
-  pi.on("before_agent_start", (event) => {
+  pi.on("before_agent_start", async (event) => {
+    // An immediate first prompt must still include the discovered Agency tools.
+    await startupPromise;
     if (!client) return;
     return { systemPrompt: `${event.systemPrompt}\n\n${AGENCY_SYSTEM_PROMPT}` };
   });
 
-  pi.on("session_shutdown", closeClient);
+  pi.on("session_shutdown", async () => {
+    startupController?.abort();
+    await closeClient();
+    await startupPromise;
+  });
 
   pi.registerCommand("agency-status", {
     description: "Show Agency CLI availability and MCP Gateway connection status",
     handler: async (_args, ctx) => {
+      if (startupPromise) {
+        ctx.ui.notify(
+          cliAvailable
+            ? "Agency MCP Gateway is connecting in the background."
+            : "Checking Agency CLI availability in the background.",
+          "info",
+        );
+        return;
+      }
       if (!cliAvailable) {
         ctx.ui.notify("Agency CLI is unavailable. Install it or add it to PATH, then /reload.", "info");
         return;
