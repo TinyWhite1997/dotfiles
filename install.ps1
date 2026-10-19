@@ -65,7 +65,8 @@ try {
             'sharkdp.bat', 'sharkdp.fd', 'BurntSushi.ripgrep.MSVC', 'junegunn.fzf',
             'ajeetdsouza.zoxide', 'ImageMagick.ImageMagick', 'sxyazi.yazi',
             'JesseDuffield.lazygit', 'Neovim.Neovim', 'Nushell.Nushell',
-            'eza-community.eza', 'max-sixty.worktrunk', 'AutoHotkey.AutoHotkey'
+            'eza-community.eza', 'max-sixty.worktrunk', 'AutoHotkey.AutoHotkey',
+            'DEVCOM.JetBrainsMonoNerdFont'
         )) { Install-WingetPackage $Package }
         Refresh-Path
 
