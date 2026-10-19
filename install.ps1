@@ -56,7 +56,7 @@ try {
             'sharkdp.bat', 'sharkdp.fd', 'BurntSushi.ripgrep.MSVC', 'junegunn.fzf',
             'ajeetdsouza.zoxide', 'ImageMagick.ImageMagick', 'sxyazi.yazi',
             'JesseDuffield.lazygit', 'Neovim.Neovim', 'Nushell.Nushell',
-            'eza-community.eza', 'max-sixty.worktrunk'
+            'eza-community.eza', 'max-sixty.worktrunk', 'AutoHotkey.AutoHotkey'
         )) { Install-WingetPackage $Package }
         Refresh-Path
 

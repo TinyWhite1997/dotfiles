@@ -4,11 +4,6 @@
       relink: true
       force: true
       create: true
-    ~/AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Startup/hotkeys.ahk:
-      path: config/autohotkey/hotkeys.ahk
-      relink: true
-      force: true
-      create: true
     ~/AppData/Local/nvim:
       path: config/nvim
       relink: true
@@ -54,6 +49,7 @@
       force: true
       create: true
 - shell:
+  - [powershell -NoProfile -ExecutionPolicy Bypass -File config/autohotkey/setup.ps1, Registering elevated AutoHotkey startup task]
   - ['nu -n -c "let init = (fzf --nushell | complete); if $init.exit_code != 0 { error make {msg: $init.stderr} }; $init.stdout | save -f ($nu.default-config-dir | path join fzf.nu); rm -f ($nu.default-config-dir | path join autoload _fzf_integration.nu)"', Generating fzf Nushell integration]
   - ['nu -n -c "zoxide init nushell | save -f ~/.zoxide.nu"', Generating zoxide Nushell integration]
   - ['nu -n -c "git-wt.exe config shell init nu | save -f ~/.worktrunk.nu"', Generating Worktrunk Nushell integration]
