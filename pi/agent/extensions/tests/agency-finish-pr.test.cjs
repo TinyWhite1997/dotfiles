@@ -116,6 +116,9 @@ test("Agency automatic startup and finish-pr lifecycle", async (t) => {
   globalThis.__agencyTestTransport = Transport;
   const hooks = registerHooks({
     resolve(specifier, context, nextResolve) {
+      if (specifier === "node:child_process") {
+        return dataModule("export function execFile(...args) { return globalThis.__agencyTestExecFile(...args); }");
+      }
       if (specifier === "@modelcontextprotocol/sdk/client/stdio.js") {
         return dataModule("export const StdioClientTransport = globalThis.__agencyTestTransport;");
       }
@@ -131,7 +134,11 @@ test("Agency automatic startup and finish-pr lifecycle", async (t) => {
       return nextResolve(specifier, context);
     },
   });
-  t.after(() => { hooks.deregister(); delete globalThis.__agencyTestTransport; });
+  t.after(() => {
+    hooks.deregister();
+    delete globalThis.__agencyTestTransport;
+    delete globalThis.__agencyTestExecFile;
+  });
   const initialize = (await import("../agency-mcp.ts")).default;
   async function runtime(t, probeResult = { code: 0, killed: false }, mode = "normal", waitForReady = true) {
     Transport.mode = mode;
@@ -140,16 +147,20 @@ test("Agency automatic startup and finish-pr lifecycle", async (t) => {
     const ctx = { cwd: tmpdir(), hasUI: true, ui: {
       notify: (message, level) => notices.push({ message, level }), setStatus() {},
     } };
-    // No registerFlag/getFlag: auto-start must not depend on a CLI switch.
+    globalThis.__agencyTestExecFile = (command, args, options, callback) => {
+      probes.push({ command, args, options });
+      assert.equal(command, "agency");
+      assert.deepEqual(args, ["--version"]);
+      assert.equal(options.cwd, ctx.cwd);
+      assert.equal(options.timeout, 5000);
+      assert.equal(options.windowsHide, true, "background CLI detection must not open a console");
+      assert.ok(options.signal instanceof AbortSignal);
+      Promise.resolve().then(() => typeof probeResult === "function" ? probeResult(options.signal) : probeResult)
+        .then(result => callback(result.code !== 0 || result.killed ? new Error("CLI unavailable") : null, "", ""), callback);
+      return {};
+    };
+    // No Pi exec or CLI flags: probing uses a hidden, output-capturing child.
     initialize({
-      exec: async (command, args, options) => {
-        probes.push({ command, args, options });
-        assert.equal(command, "agency");
-        assert.deepEqual(args, ["--version"]);
-        assert.equal(options.timeout, 5000);
-        assert.ok(options.signal instanceof AbortSignal);
-        return typeof probeResult === "function" ? probeResult(options.signal) : probeResult;
-      },
       on: (name, handler) => events.set(name, handler),
       registerTool: (tool) => tools.set(tool.name, tool),
       registerCommand: (name, command) => commands.set(name, command),

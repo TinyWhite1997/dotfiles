@@ -190,6 +190,12 @@ injecting its system-prompt guidance. Gateway connection errors after a successf
 check are still reported. An immediate first prompt waits for background startup
 before reaching the model, so its Agency tools and guidance are not missed.
 Shutdown/reload cancels pending detection/connection and closes the Gateway.
+CLI detection uses a hidden, output-capturing process on Windows; Gateway stderr
+is also piped instead of inheriting the active terminal.
+
+These changes remove Agency's handshake from the UI startup path, not the import
+cost of other extensions. When measuring interactive startup, use the installed
+`pi` command (its bundled entry), not the unbundled SDK CLI or RPC readiness.
 
 Use `/agency-status` to inspect detection, connection, and availability state. After installing
 Agency or changing PATH, restart Pi (or `/reload` if this process already has the

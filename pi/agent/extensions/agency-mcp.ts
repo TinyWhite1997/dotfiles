@@ -1,4 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import {
   DEFAULT_MAX_BYTES,
   DEFAULT_MAX_LINES,
@@ -28,6 +30,8 @@ interface McpContent {
   };
   [key: string]: unknown;
 }
+
+const execFileAsync = promisify(execFile);
 
 const AGENCY_SYSTEM_PROMPT = `## Agency MCP Gateway
 
@@ -236,7 +240,7 @@ export default function agencyMcpExtension(pi: ExtensionAPI) {
         command: "agency",
         args: ["mcp", "gateway"],
         env: cleanEnvironment(),
-        stderr: ctx.hasUI ? "pipe" : "inherit",
+        stderr: "pipe",
       });
       transport = nextTransport;
       nextTransport.stderr?.on("data", (chunk) => {
@@ -330,12 +334,16 @@ export default function agencyMcpExtension(pi: ExtensionAPI) {
     startupPromise = (async () => {
       try {
         // Probe before starting a Gateway; machines without Agency stay quiet.
-        const probe = await pi.exec("agency", ["--version"], {
+        // Pi's exec() does not set windowsHide; a background console probe can
+        // briefly disturb the active Windows terminal even with output piped.
+        await execFileAsync("agency", ["--version"], {
+          cwd: ctx.cwd,
           timeout: 5_000,
+          windowsHide: true,
           signal: controller.signal,
         });
         if (controller.signal.aborted) return;
-        cliAvailable = probe.code === 0 && !probe.killed;
+        cliAvailable = true;
       } catch {
         return;
       }
