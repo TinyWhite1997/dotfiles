@@ -120,12 +120,9 @@ function Invoke-Switch([string]$Worktrunk, [string]$HerdrBin, [string]$SourceCwd
     $SwitchArgs = New-SwitchArguments $Branch $Base $Existing
     $RootWorkspace = Get-RootWorkspaceId $HerdrBin $SourceCwd $SourceWorkspace
     $SwitchArgs += @(
-        '--execute', $HerdrBin.Replace('\', '/'), '--',
-        'worktree', 'open',
-        '--workspace', $RootWorkspace,
-        '--branch', '{{ branch }}',
-        '--label', '{{ branch }}',
-        '--focus'
+        '--execute', 'node', '--',
+        (Join-Path $PSScriptRoot 'open.cjs'),
+        '{{ branch }}', $RootWorkspace, $HerdrBin
     )
     & $Worktrunk -C $SourceCwd @SwitchArgs | Out-Null
     return $LASTEXITCODE

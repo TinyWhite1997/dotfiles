@@ -49,7 +49,7 @@ if ($Schema2[0].is_main) { throw 'schema 2 main flag should be normalized' }
             Assert-Equal $Status $Probe.Status 'execute failure must propagate'
             $Arguments = $Probe.Arguments
             $ExecuteArgs = $Arguments[($Arguments.IndexOf('--execute') + 1)..($Arguments.Count - 1)]
-            $Expected = @('C:/Program Files/Herdr/herdr.exe', '--', 'worktree', 'open', '--workspace', 'w-root', '--branch', '{{ branch }}', '--label', '{{ branch }}', '--focus')
+            $Expected = @('node', '--', (Join-Path $Root 'scripts\open.cjs'), '{{ branch }}', 'w-root', 'C:\Program Files\Herdr\herdr.exe')
             Assert-Equal ($ExecuteArgs -join '|') ($Expected -join '|') 'open must use the resolved branch, not an MSYS worktree path or input shortcut'
             Assert-Equal ($Arguments -contains '--create') (-not $Existing) 'only new branches should be created'
             Assert-Equal ($Arguments -contains '--base') ($Base -eq 'current' -and -not $Existing) 'current-base creation should retain --base'
