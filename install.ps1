@@ -21,6 +21,15 @@ function Install-WingetPackage([string]$Id) {
     if ($LASTEXITCODE -ne 0) { throw "Failed to install $Id." }
 }
 
+function Get-DotbotPython {
+    # Store Python redirects AppData writes into its private cache, hiding Dotbot links from apps.
+    foreach ($Command in (Get-Command python, python3 -All -CommandType Application -ErrorAction SilentlyContinue)) {
+        if ($Command.Source -like '*\Microsoft\WindowsApps\*') { continue }
+        & $Command.Source -V | Out-Host
+        if ($LASTEXITCODE -eq 0) { return $Command.Source }
+    }
+}
+
 function Refresh-Path {
     $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' +
         [Environment]::GetEnvironmentVariable('Path', 'User') + ';' + $env:Path
@@ -66,14 +75,15 @@ try {
         git submodule update --init --recursive dotbot
         if ($LASTEXITCODE -ne 0) { throw 'Dotbot submodule installation failed.' }
     }
-    $Python = $null
-    foreach ($Candidate in @('python', 'python3')) {
-        if (Get-Command $Candidate -ErrorAction SilentlyContinue) {
-            & $Candidate -V
-            if ($LASTEXITCODE -eq 0) { $Python = $Candidate; break }
-        }
+    $Python = Get-DotbotPython
+    if (-not $Python) {
+        Install-WingetPackage 'Python.Python.3.13'
+        Refresh-Path
+        $Python = Get-DotbotPython
     }
-    if (-not $Python) { throw 'Cannot find Python for Dotbot.' }
+    if (-not $Python) { throw 'Cannot find non-Store Python for Dotbot. Restart the terminal and retry.' }
+    & $Python -c "import os, sys, tempfile; d = tempfile.TemporaryDirectory(); os.symlink(sys.executable, os.path.join(d.name, 'link')); d.cleanup()"
+    if ($LASTEXITCODE -ne 0) { throw 'Dotbot needs symlink privileges. Enable Windows Developer Mode or rerun this installer as administrator.' }
     if (-not $AgentsOnly) {
         & $Python "$PSScriptRoot/dotbot/bin/dotbot" -d $PSScriptRoot -c "$PSScriptRoot/install.conf-win.yaml" @DotbotArgs
         if ($LASTEXITCODE -ne 0) { throw 'Dotbot installation failed.' }

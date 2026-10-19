@@ -23,11 +23,13 @@
     ~/AppData/Roaming/herdr/config.toml:
       path: herdr/config.toml
       relink: true
+      backup: true
       force: true
       create: true
     ~/AppData/Roaming/alacritty/alacritty.toml:
       path: config/alacritty/alacritty.toml
       relink: true
+      backup: true
       force: true
       create: true
     ~/AppData/Roaming/nushell/config.nu:
