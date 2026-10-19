@@ -1,5 +1,9 @@
 $ErrorActionPreference = 'Stop'
 
+# Herdr emits UTF-8 JSON; Windows PowerShell otherwise decodes it using the console code page.
+[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
+$OutputEncoding = [Console]::OutputEncoding
+
 $Repo = Split-Path $PSScriptRoot -Parent
 $Plugins = (herdr plugin list --json | ConvertFrom-Json).result.plugins.plugin_id
 
