@@ -46,15 +46,46 @@ namespace SelectionTranslator
         {
             return instance.GetType().GetField(name, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(instance);
         }
-        public static void Smoke()
+        [DllImport("user32.dll")] static extern uint GetClipboardSequenceNumber();
+        [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr hwnd);
+        [DllImport("user32.dll")] static extern bool SetCursorPos(int x, int y);
+        [DllImport("user32.dll")] static extern bool GetCursorPos(out CursorPoint point);
+        [DllImport("user32.dll")] static extern void mouse_event(uint flags, uint x, uint y, uint data, UIntPtr extra);
+        [StructLayout(LayoutKind.Sequential)] struct CursorPoint { public int X, Y; }
+
+        public static void Fixture()
+        {
+            var window = new Window { Title = "SelectionTranslatorFixture", Topmost = true, Left = 40, Top = 40, Width = 360, Height = 220 };
+            var panel = new StackPanel();
+            var text = new RichTextBox { Height = 100, IsReadOnly = true };
+            AutomationProperties.SetAutomationId(text, "FixtureText");
+            text.Document.Blocks.Add(new System.Windows.Documents.Paragraph(new System.Windows.Documents.Run("hello")));
+            var button = new Button { Content = "Focus remains here" };
+            panel.Children.Add(text); panel.Children.Add(button); window.Content = panel;
+            // Keep selection in a document while keyboard focus is on a different control.
+            text.AddHandler(UIElement.MouseLeftButtonUpEvent, new System.Windows.Input.MouseButtonEventHandler(delegate {
+                window.Dispatcher.BeginInvoke(new Action(delegate { text.SelectAll(); button.Focus(); }));
+            }), true);
+            new Application().Run(window);
+        }
+
+        public static void Smoke(string scriptPath)
         {
             IntPtr foreground = Native.GetForegroundWindow();
-            var window = (Desktop)Activator.CreateInstance(typeof(Desktop), System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
-                null, new object[] { "unused-auth-path", "gpt-5.6-luna" }, null);
+            CursorPoint cursor; GetCursorPos(out cursor);
+            uint clipboardSequence = GetClipboardSequenceNumber();
+            string path = Path.GetTempFileName();
+            File.WriteAllText(path, "{\"github-copilot\":{\"access\":\"cached;proxy-ep=business.example\",\"expires\":4102444800000}}");
+            var handler = new Handler { Reject = true };
+            var window = new Desktop(new CopilotClient(path, "gpt-5.6-luna", handler), "gpt-5.6-luna");
+            window.WindowStartupLocation = WindowStartupLocation.Manual;
+            window.Left = SystemParameters.WorkArea.Right - window.Width;
+            window.Top = SystemParameters.WorkArea.Bottom - window.Height;
             var app = new Application();
             Exception failure = null;
+            Process fixture = null;
             var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
-            timer.Tick += delegate {
+            timer.Tick += async delegate {
                 timer.Stop();
                 try
                 {
@@ -62,24 +93,64 @@ namespace SelectionTranslator
                     Check(Native.GetForegroundWindow() == foreground, "startup preserves foreground");
                     Check(!Native.RegisterHotKey(IntPtr.Zero, 77, 0x4003, 0x54), "app owns Ctrl+Alt+T");
                     var auto = (CheckBox)Field(window, "automatic");
-                    Check(auto.IsChecked != true, "automatic upload disabled by default");
-                    auto.IsChecked = true;
-                    Check((IntPtr)Field(window, "mouseHook") != IntPtr.Zero, "mouse hook installed on opt-in");
+                    Check(auto.IsChecked == true, "automatic translation enabled on startup");
+                    Check((IntPtr)Field(window, "mouseHook") != IntPtr.Zero, "mouse hook installed on startup");
+                    fixture = Process.Start(new ProcessStartInfo("powershell.exe", "-NoProfile -STA -ExecutionPolicy Bypass -File \"" + scriptPath + "\" -Fixture") { UseShellExecute = false, CreateNoWindow = true });
+                    IntPtr handle = IntPtr.Zero;
+                    for (int i = 0; i < 150 && handle == IntPtr.Zero; i++) { await Task.Delay(100); fixture.Refresh(); handle = fixture.MainWindowHandle; }
+                    Check(handle != IntPtr.Zero, "external selection fixture started");
+                    SetForegroundWindow(handle);
+                    await Task.Delay(300);
+                    var box = await Task.Run(() => AutomationElement.FromHandle(handle).FindFirst(TreeScope.Descendants,
+                        new PropertyCondition(AutomationElement.AutomationIdProperty, "FixtureText")));
+                    var bounds = box.Current.BoundingRectangle;
+                    Check(!bounds.IsEmpty, "external document exposes UI Automation");
+                    int x = (int)(bounds.Left + 30), y = (int)(bounds.Top + 25);
+                    window.WindowState = WindowState.Minimized;
+                    Check(SetCursorPos(x, y), "test cursor moves to selection fixture");
+                    mouse_event(0x0002, 0, 0, 0, UIntPtr.Zero);
+                    mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero);
+                    await Task.Delay(100);
+                    Check(Native.GetForegroundWindow() == handle, "mouse activates test fixture");
+                    var result = (TextBox)Field(window, "translated");
+                    var status = (TextBlock)Field(window, "status");
+                    for (int i = 0; i < 100 && !status.Text.Contains("HTTP 401"); i++) await Task.Delay(100);
+                    Check(status.Text.Contains("HTTP 401") && result.Text == "", "API failure visibly reported");
+                    Check(handler.Translations == 1, "failed request is not automatically retried");
+                    handler.Reject = false;
+                    mouse_event(0x0002, 0, 0, 0, UIntPtr.Zero);
+                    mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero);
+                    for (int i = 0; i < 100 && result.Text != "你好"; i++) await Task.Delay(100);
+                    Check(result.Text == "你好", "mouse release automatically translates external document without a hotkey");
+                    Check(((TextBox)Field(window, "original")).Text == "hello", "only selected text captured");
+                    Check(handler.Translations == 2, "same selection can be retried after failure");
+                    Check(Native.GetForegroundWindow() == handle, "translation does not steal focus");
+                    Check(window.WindowState == WindowState.Normal, "automatic translation restores minimized window");
+                    Check(GetClipboardSequenceNumber() == clipboardSequence, "automatic translation never modifies clipboard");
+                    mouse_event(0x0002, 0, 0, 0, UIntPtr.Zero);
+                    mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero);
+                    await Task.Delay(1000);
+                    Check(handler.Translations == 2, "unchanged successful selection deduplicated");
+                    Check(status.Text != "正在读取选区…", "deduplication does not leave reading status stuck");
                     auto.IsChecked = false;
-                    Check((IntPtr)Field(window, "mouseHook") == IntPtr.Zero, "mouse hook released on opt-out");
+                    Check((IntPtr)Field(window, "mouseHook") == IntPtr.Zero, "mouse hook released on pause");
                     window.WindowState = WindowState.Minimized;
                     Check(window.WindowState == WindowState.Minimized, "window minimizes");
                 }
                 catch (Exception error) { failure = error; }
-                finally { window.Close(); }
+                finally {
+                    if (fixture != null) { if (!fixture.HasExited) { fixture.Kill(); fixture.WaitForExit(3000); } fixture.Dispose(); }
+                    SetCursorPos(cursor.X, cursor.Y);
+                    SetForegroundWindow(foreground);
+                    window.Close(); File.Delete(path);
+                }
             };
             timer.Start();
             app.Run(window);
             if (failure != null) throw failure;
             Check(Native.RegisterHotKey(IntPtr.Zero, 77, 0x4003, 0x54), "hotkey released on exit");
             Native.UnregisterHotKey(IntPtr.Zero, 77);
-            Check(Native.GetForegroundWindow() == foreground, "exit preserves foreground");
-            Console.WriteLine("PASS: " + checks + " desktop smoke assertions (no live API calls)");
+            Console.WriteLine("PASS: " + checks + " desktop/selection assertions (mock Copilot, real mouse + cross-process UI Automation)");
         }
         public static void Run()
         {

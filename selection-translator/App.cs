@@ -166,38 +166,55 @@ namespace SelectionTranslator
         [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint processId);
         [DllImport("user32.dll")] public static extern short GetAsyncKeyState(int key);
 
-        public static string ReadSelection(IntPtr foreground)
+        public static string ReadSelection(IntPtr foreground, Point? point = null)
         {
             uint pid;
             GetWindowThreadProcessId(foreground, out pid);
             if (foreground == IntPtr.Zero || pid == Process.GetCurrentProcess().Id) return "";
             try
             {
-                AutomationElement element = AutomationElement.FocusedElement;
-                // Only inspect the foreground application's focused control and its ancestors.
-                for (int i = 0; element != null && i < 12; i++)
-                {
-                    if (element.Current.ProcessId != pid || element.Current.IsPassword) return "";
-                    object pattern;
-                    if (element.TryGetCurrentPattern(TextPattern.Pattern, out pattern))
-                    {
-                        var parts = ((TextPattern)pattern).GetSelection();
-                        var text = new StringBuilder();
-                        foreach (var part in parts)
-                        {
-                            if (text.Length > 0) text.AppendLine();
-                            text.Append(part.GetText(CopilotClient.MaxTextLength + 1));
-                            if (text.Length > CopilotClient.MaxTextLength) break;
-                        }
-                        if (GetForegroundWindow() != foreground) return "";
-                        return text.ToString().Trim();
-                    }
-                    element = TreeWalker.ControlViewWalker.GetParent(element);
-                }
+                var focused = AutomationElement.FocusedElement;
+                if (focused != null && focused.Current.IsPassword) return "";
+                // Browser selection need not belong to the keyboard-focused control.
+                string text = point.HasValue ? ReadSelectionPath(AutomationElement.FromPoint(point.Value), foreground) : "";
+                if (String.IsNullOrWhiteSpace(text)) text = ReadSelectionPath(focused, foreground);
+                return GetForegroundWindow() == foreground ? text : "";
             }
             catch (ElementNotAvailableException) { }
             catch (InvalidOperationException) { }
             catch (COMException) { }
+            return "";
+        }
+
+        static string ReadSelectionPath(AutomationElement element, IntPtr foreground)
+        {
+            var path = new List<AutomationElement>();
+            bool belongsToWindow = false;
+            for (int i = 0; element != null && i < 32; i++)
+            {
+                if (element.Current.IsPassword) return "";
+                path.Add(element);
+                if (new IntPtr(element.Current.NativeWindowHandle) == foreground) { belongsToWindow = true; break; }
+                element = TreeWalker.ControlViewWalker.GetParent(element);
+            }
+            // Chromium accessibility children can have a different PID from the top-level window.
+            if (!belongsToWindow) return "";
+            foreach (var candidate in path)
+            {
+                object pattern;
+                if (!candidate.TryGetCurrentPattern(TextPattern.Pattern, out pattern)) continue;
+                var text = new StringBuilder();
+                foreach (var part in ((TextPattern)pattern).GetSelection())
+                {
+                    string selected = part.GetText(CopilotClient.MaxTextLength + 1);
+                    if (String.IsNullOrEmpty(selected)) continue;
+                    if (text.Length > 0) text.AppendLine();
+                    text.Append(selected);
+                    if (text.Length > CopilotClient.MaxTextLength) break;
+                }
+                // A collapsed caret is not a selection; keep trying its document ancestors.
+                if (!String.IsNullOrWhiteSpace(text.ToString())) return text.ToString().Trim();
+            }
             return "";
         }
     }
@@ -217,10 +234,12 @@ namespace SelectionTranslator
         string lastSelection;
         long generation;
         bool readingSelection, closed;
+        Point? selectionPoint;
 
-        Desktop(string authPath, string model)
+        internal Desktop(string authPath, string model) : this(new CopilotClient(authPath, model), model) { }
+        internal Desktop(CopilotClient client, string model)
         {
-            client = new CopilotClient(authPath, model);
+            this.client = client;
             Title = "划词翻译 · Copilot Luna";
             Width = 490; Height = 500; MinWidth = 380; MinHeight = 380;
             Topmost = true;
@@ -233,7 +252,7 @@ namespace SelectionTranslator
             var header = new StackPanel();
             DockPanel.SetDock(header, Dock.Top); layout.Children.Add(header);
             header.Children.Add(new TextBlock { Text = "划词翻译", FontSize = 23, FontWeight = FontWeights.SemiBold });
-            header.Children.Add(new TextBlock { Text = "选中文字 → Ctrl+Alt+T · " + model, Margin = new Thickness(0, 5, 0, 5) });
+            header.Children.Add(new TextBlock { Text = "划选文字，松开鼠标自动翻译 · " + model, Margin = new Thickness(0, 5, 0, 5) });
             header.Children.Add(automatic);
             header.Children.Add(new TextBlock { Text = "原文（也可手动粘贴，最多 8000 字符）" });
             original.MaxLength = CopilotClient.MaxTextLength;
@@ -245,14 +264,14 @@ namespace SelectionTranslator
             buttons.Children.Add(translate); buttons.Children.Add(copy); header.Children.Add(buttons);
             header.Children.Add(status);
             layout.Children.Add(translated);
-            status.Text = "默认仅快捷键触发；不读取或改写剪贴板。关闭窗口即退出。";
+            status.Text = "启动后自动翻译；选中文字会发送到 Copilot。关闭窗口即退出。";
             translate.Click += async delegate { await Translate(original.Text); };
             copy.Click += delegate {
                 try { if (!String.IsNullOrEmpty(translated.Text)) Clipboard.SetText(translated.Text); }
                 catch (ExternalException) { status.Text = "剪贴板正被占用，请稍后重试。"; }
             };
             automatic.Checked += delegate { EnableAutomatic(); };
-            automatic.Unchecked += delegate { DisableAutomatic(); CancelPending(); };
+            automatic.Unchecked += delegate { DisableAutomatic(); CancelPending(); status.Text = "自动翻译已暂停。"; };
             mouseCallback = OnMouse;
             debounce.Tick += async delegate {
                 debounce.Stop();
@@ -265,10 +284,10 @@ namespace SelectionTranslator
                 // MOD_NOREPEAT | MOD_CONTROL | MOD_ALT; no keyboard or clipboard injection.
                 if (!Native.RegisterHotKey(hwnd, 1, 0x4003, 0x54))
                 {
-                    MessageBox.Show("Ctrl+Alt+T 已被其他程序占用，或已有翻译窗口。请关闭占用它的程序后重试。", "无法注册快捷键");
-                    Close();
+                    status.Text = "Ctrl+Alt+T 已被占用，不影响鼠标划选自动翻译。";
                 }
             };
+            Loaded += delegate { automatic.IsChecked = true; };
             Closed += delegate {
                 closed = true;
                 DisableAutomatic(); CancelPending();
@@ -307,6 +326,7 @@ namespace SelectionTranslator
             if (code >= 0 && message.ToInt32() == 0x0202)
             {
                 // The hook only schedules work; UI Automation and network I/O never run in it.
+                selectionPoint = new Point(Marshal.ReadInt32(data), Marshal.ReadInt32(data, 4));
                 debounce.Stop(); debounce.Start();
             }
             return Native.CallNextHookEx(mouseHook, code, message, data);
@@ -333,16 +353,28 @@ namespace SelectionTranslator
                 for (int i = 0; i < 50 && ((Native.GetAsyncKeyState(0x11) | Native.GetAsyncKeyState(0x12)) & 0x8000) != 0; i++)
                     await Task.Delay(20);
             IntPtr foreground = Native.GetForegroundWindow();
+            uint pid;
+            Native.GetWindowThreadProcessId(foreground, out pid);
+            if (foreground == IntPtr.Zero || pid == Process.GetCurrentProcess().Id) return;
+            Point? point = auto ? selectionPoint : null;
             long capturedGeneration = generation;
             readingSelection = true;
             string text;
-            try { text = await Task.Run(() => Native.ReadSelection(foreground)); }
-            catch (Exception) { if (!closed && !auto) status.Text = "无法读取此应用的选区，请手动粘贴。"; return; }
+            status.Text = "正在读取选区…";
+            try { text = await Task.Run(() => Native.ReadSelection(foreground, point)); }
+            catch (Exception) { if (!closed) status.Text = "无法读取此应用的选区，请手动粘贴。"; return; }
             finally { readingSelection = false; }
             if (closed || capturedGeneration != generation || Native.GetForegroundWindow() != foreground || (auto && automatic.IsChecked != true)) return;
-            if (auto && String.IsNullOrWhiteSpace(text)) { lastSelection = null; return; }
+            if (String.IsNullOrWhiteSpace(text)) {
+                lastSelection = null;
+                status.Text = "未读到选中文字：请在支持的应用中划选，或将原文粘贴到这里。";
+                return;
+            }
             string key = foreground.ToString() + ":" + text;
-            if (auto && key == lastSelection) return;
+            if (auto && key == lastSelection) {
+                status.Text = pending != null ? "正在翻译…" : "相同选区，已跳过重复请求。";
+                return;
+            }
             lastSelection = key;
             await Translate(text);
         }
@@ -364,9 +396,10 @@ namespace SelectionTranslator
                 string answer = await client.TranslateAsync(text, cancellation.Token);
                 if (!closed && requestGeneration == generation) { translated.Text = answer; status.Text = "翻译完成"; }
             }
-            catch (OperationCanceledException) { if (!closed && requestGeneration == generation) status.Text = "请求超时，请重试。"; }
+            catch (OperationCanceledException) { if (!closed && requestGeneration == generation) { lastSelection = null; status.Text = "请求超时，请重新划选重试。"; } }
             catch (Exception error) {
                 if (!closed && requestGeneration == generation) {
+                    lastSelection = null;
                     status.Text = error is ArgumentException || error is InvalidOperationException ? error.Message : "翻译失败，请检查网络和登录凭据。";
                     if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
                 }
@@ -382,8 +415,13 @@ namespace SelectionTranslator
         public static void Run(string authPath, string model)
         {
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
-            var app = new Application();
-            app.Run(new Desktop(authPath, model));
+            bool created;
+            using (var singleton = new Mutex(true, "Local\\SelectionTranslator", out created))
+            {
+                if (!created) { MessageBox.Show("划词翻译已经运行，请查看任务栏中的翻译窗口。", "划词翻译"); return; }
+                try { new Application().Run(new Desktop(authPath, model)); }
+                finally { singleton.ReleaseMutex(); }
+            }
         }
     }
 }

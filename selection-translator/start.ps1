@@ -3,7 +3,8 @@ param(
     [string]$AuthPath = (Join-Path $HOME '.pi\agent\auth.json'),
     [string]$Probe,
     [switch]$Test,
-    [switch]$Smoke
+    [switch]$Smoke,
+    [switch]$Fixture
 )
 $ErrorActionPreference = 'Stop'
 # Windows PowerShell supplies WPF and the .NET Framework compiler without an SDK.
@@ -19,10 +20,12 @@ $references = @('System.dll', 'System.Core.dll', 'System.Xaml.dll', 'System.Net.
     [System.Windows.Automation.AutomationElement].Assembly.Location,
     [System.Windows.Automation.AutomationPattern].Assembly.Location)
 $source = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'App.cs') -Raw -Encoding UTF8
-if ($Test -or $Smoke) { $source += "`n" + (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'Tests.cs') -Raw -Encoding UTF8) }
+if ($Test -or $Smoke -or $Fixture) { $source += "`n" + (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'Tests.cs') -Raw -Encoding UTF8) }
 Add-Type -TypeDefinition $source -ReferencedAssemblies $references
-if ($Smoke) {
-    [SelectionTranslator.Tests]::Smoke()
+if ($Fixture) {
+    [SelectionTranslator.Tests]::Fixture()
+} elseif ($Smoke) {
+    [SelectionTranslator.Tests]::Smoke($PSCommandPath)
 } elseif ($Test) {
     [SelectionTranslator.Tests]::Run()
 } elseif ($PSBoundParameters.ContainsKey('Probe')) {
