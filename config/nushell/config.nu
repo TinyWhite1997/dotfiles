@@ -35,7 +35,8 @@ $env.FZF_ALT_C_OPTS = r#'
 '#
 $env.FZF_COMPLETION_TRIGGER = 'jj'
 
-source ($nu.config-path | path expand | path dirname | path join fzf-herdr.nu)
+const config_dir = path self | path expand | path dirname
+source ($config_dir | path join fzf-herdr.nu)
 source ~/.zoxide.nu
 source ~/.worktrunk.nu
 alias wt = git-wt

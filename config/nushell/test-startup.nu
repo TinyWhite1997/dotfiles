@@ -13,4 +13,14 @@ let expected_root = if ('D:/' | path exists) {
 assert equal $env.WORKTRUNK_WORKTREE_PATH $"($expected_root)/{{ repo }}/{{ branch | sanitize }}"
 assert equal ($env.PROMPT_COMMAND | describe) 'closure'
 assert equal ($env.PROMPT_COMMAND_RIGHT | describe) 'closure'
-print 'startup: configuration loaded and worktree root resolved successfully'
+for item in [
+  {name: l, expansion: 'eza -lh'}
+  {name: ls, expansion: 'eza -lh'}
+  {name: la, expansion: 'eza -lha'}
+  {name: ll, expansion: 'eza -lh'}
+] {
+  assert equal (scope aliases | where name == $item.name | get expansion | first) $item.expansion
+}
+assert equal (which z | first | get type) 'alias'
+assert equal (which zi | first | get type) 'alias'
+print 'startup: configuration, worktree root, listing aliases, and zoxide loaded successfully'
