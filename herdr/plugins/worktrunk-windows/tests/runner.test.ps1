@@ -28,7 +28,6 @@ if ($Schema2[0].is_main) { throw 'schema 2 main flag should be normalized' }
     $Probe = @{ Arguments = @(); Branch = '^'; Existing = $true; Status = 0 }
     function Select-Branch { return $Probe.Branch }
     function Test-WorktrunkRef { return $Probe.Existing }
-    function Get-RootWorkspaceId { return 'w-root' }
     function Test-Worktrunk {
         $global:LASTEXITCODE = 0
         Assert-Equal $args[0] '-C' 'every Worktrunk call must specify its source directory'
@@ -45,11 +44,11 @@ if ($Schema2[0].is_main) { throw 'schema 2 main flag should be normalized' }
             $Probe.Existing = $Existing
             $Probe.Branch = if ($Existing) { '^' } else { 'weikai/redployImage' }
             $Probe.Status = if ($Existing) { 0 } else { 7 }
-            $Status = Invoke-Switch 'Test-Worktrunk' 'C:\Program Files\Herdr\herdr.exe' 'D:/repo with spaces' 'w-child' $Base
+            $Status = Invoke-Switch 'Test-Worktrunk' 'C:\Program Files\Herdr\herdr.exe' 'D:/repo with spaces' $Base
             Assert-Equal $Status $Probe.Status 'execute failure must propagate'
             $Arguments = $Probe.Arguments
             $ExecuteArgs = $Arguments[($Arguments.IndexOf('--execute') + 1)..($Arguments.Count - 1)]
-            $Expected = @('node', '--', (Join-Path $Root 'scripts\open.cjs'), '{{ branch }}', 'w-root', 'C:\Program Files\Herdr\herdr.exe')
+            $Expected = @('node', '--', (Join-Path $Root 'scripts\open.cjs'), '{{ branch }}', 'C:\Program Files\Herdr\herdr.exe')
             Assert-Equal ($ExecuteArgs -join '|') ($Expected -join '|') 'open must use the resolved branch, not an MSYS worktree path or input shortcut'
             Assert-Equal ($Arguments -contains '--create') (-not $Existing) 'only new branches should be created'
             Assert-Equal ($Arguments -contains '--base') ($Base -eq 'current' -and -not $Existing) 'current-base creation should retain --base'
@@ -81,7 +80,7 @@ if ($Schema2[0].is_main) { throw 'schema 2 main flag should be normalized' }
             return $null
         }
         foreach ($Base in 'default', 'current') {
-            Assert-Equal (Invoke-Switch $Worktrunk 'unused-herdr' $Repo 'w-test' $Base) 0 'switch picker must list the repo from another cwd'
+            Assert-Equal (Invoke-Switch $Worktrunk 'unused-herdr' $Repo $Base) 0 'switch picker must list the repo from another cwd'
         }
         Assert-Equal (Invoke-Remove $Worktrunk 'unused-herdr' $Repo) 0 'remove picker must list the repo from another cwd'
     } finally {

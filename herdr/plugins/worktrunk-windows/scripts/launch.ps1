@@ -30,8 +30,7 @@ $OpenArgs = @(
 foreach ($entry in @(
     "WORKTRUNK_HERDR_MODE=$Mode",
     "WORKTRUNK_HERDR_RUNNER=$Runner",
-    "WORKTRUNK_HERDR_SOURCE_CWD=$Cwd",
-    "WORKTRUNK_HERDR_SOURCE_WORKSPACE=$WorkspaceId"
+    "WORKTRUNK_HERDR_SOURCE_CWD=$Cwd"
 )) {
     $OpenArgs += @('--env', $entry)
 }

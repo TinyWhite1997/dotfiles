@@ -57,16 +57,6 @@ function Get-WorktrunkCommand {
     throw 'Worktrunk was not found. Install it with: winget install max-sixty.worktrunk'
 }
 
-function Get-RootWorkspaceId([string]$HerdrBin, [string]$SourceCwd, [string]$Fallback) {
-    try {
-        $Reply = Convert-HerdrJson (& $HerdrBin worktree list --cwd $SourceCwd)
-        if ($LASTEXITCODE -eq 0 -and $Reply.result.source.source_workspace_id) {
-            return $Reply.result.source.source_workspace_id
-        }
-    } catch {}
-    return $Fallback
-}
-
 function Test-WorktrunkShortcut([string]$Branch) {
     return $Branch -eq '^' -or $Branch -eq '-' -or $Branch.Contains(':')
 }
@@ -109,7 +99,7 @@ function Select-Branch([object[]]$Worktrees, [string]$SourceCwd, [string]$Base) 
     return $Choice[-1].Trim()
 }
 
-function Invoke-Switch([string]$Worktrunk, [string]$HerdrBin, [string]$SourceCwd, [string]$SourceWorkspace, [string]$Base) {
+function Invoke-Switch([string]$Worktrunk, [string]$HerdrBin, [string]$SourceCwd, [string]$Base) {
     $ListLines = & $Worktrunk -C $SourceCwd list --format=json
     if ($LASTEXITCODE -ne 0) { return $LASTEXITCODE }
     $Worktrees = Get-WorktrunkList $ListLines
@@ -118,11 +108,10 @@ function Invoke-Switch([string]$Worktrunk, [string]$HerdrBin, [string]$SourceCwd
     if (-not $Branch) { return 0 }
     $Existing = (Test-WorktrunkShortcut $Branch) -or (Test-WorktrunkRef $SourceCwd $Branch)
     $SwitchArgs = New-SwitchArguments $Branch $Base $Existing
-    $RootWorkspace = Get-RootWorkspaceId $HerdrBin $SourceCwd $SourceWorkspace
     $SwitchArgs += @(
         '--execute', 'node', '--',
         (Join-Path $PSScriptRoot 'open.cjs'),
-        '{{ branch }}', $RootWorkspace, $HerdrBin
+        '{{ branch }}', $HerdrBin
     )
     & $Worktrunk -C $SourceCwd @SwitchArgs | Out-Null
     return $LASTEXITCODE
@@ -170,9 +159,8 @@ if ($MyInvocation.InvocationName -eq '.') { return }
 
 $Mode = $env:WORKTRUNK_HERDR_MODE
 $SourceCwd = $env:WORKTRUNK_HERDR_SOURCE_CWD
-$SourceWorkspace = $env:WORKTRUNK_HERDR_SOURCE_WORKSPACE
 $HerdrBin = if ($env:HERDR_BIN_PATH) { $env:HERDR_BIN_PATH } else { 'herdr' }
-if (-not $Mode -or -not $SourceCwd -or -not $SourceWorkspace) {
+if (-not $Mode -or -not $SourceCwd) {
     throw 'Worktrunk runner was started without Herdr source context.'
 }
 
@@ -180,7 +168,7 @@ $Worktrunk = Get-WorktrunkCommand
 $Status = if ($Mode -eq 'remove') {
     Invoke-Remove $Worktrunk $HerdrBin $SourceCwd
 } else {
-    Invoke-Switch $Worktrunk $HerdrBin $SourceCwd $SourceWorkspace $Mode
+    Invoke-Switch $Worktrunk $HerdrBin $SourceCwd $Mode
 }
 
 if ($Status -ne 0) { throw "Worktrunk failed with exit code $Status." }
