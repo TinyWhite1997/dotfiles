@@ -30,7 +30,7 @@ if ($Fixture) {
     [SelectionTranslator.Tests]::Run()
 } elseif ($PSBoundParameters.ContainsKey('Probe')) {
     $client = New-Object SelectionTranslator.CopilotClient($AuthPath, $Model)
-    try { $client.TranslateAsync($Probe, [Threading.CancellationToken]::None).GetAwaiter().GetResult() }
+    try { $client.TranslateToConsole($Probe) }
     finally { $client.Dispose() }
 } else {
     [SelectionTranslator.Desktop]::Run($AuthPath, $Model)
