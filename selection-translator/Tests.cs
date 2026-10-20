@@ -69,6 +69,21 @@ namespace SelectionTranslator
             new Application().Run(window);
         }
 
+        static Rect WindowBounds(Window window)
+        {
+            return AutomationElement.FromHandle(new WindowInteropHelper(window).Handle).Current.BoundingRectangle;
+        }
+        static void ClickAt(int x, int y)
+        {
+            Check(SetCursorPos(x, y), "test cursor moves");
+            mouse_event(0x0002, 0, 0, 0, UIntPtr.Zero);
+            mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero);
+        }
+        static void ClickWindow(Window window)
+        {
+            var bounds = WindowBounds(window);
+            ClickAt((int)(bounds.Left + bounds.Width / 2), (int)(bounds.Top + bounds.Height / 2));
+        }
         public static void Smoke(string scriptPath)
         {
             IntPtr foreground = Native.GetForegroundWindow();
@@ -87,13 +102,12 @@ namespace SelectionTranslator
             var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
             timer.Tick += async delegate {
                 timer.Stop();
-                try
-                {
+                try {
                     Check(window.IsVisible && window.Topmost && !window.ShowActivated, "visible non-activating floating window");
                     Check(Native.GetForegroundWindow() == foreground, "startup preserves foreground");
                     Check(!Native.RegisterHotKey(IntPtr.Zero, 77, 0x4003, 0x54), "app owns Ctrl+Alt+T");
                     var auto = (CheckBox)Field(window, "automatic");
-                    Check(auto.IsChecked == true, "automatic translation enabled on startup");
+                    Check(auto.IsChecked == true, "selection button detection enabled on startup");
                     Check((IntPtr)Field(window, "mouseHook") != IntPtr.Zero, "mouse hook installed on startup");
                     fixture = Process.Start(new ProcessStartInfo("powershell.exe", "-NoProfile -STA -ExecutionPolicy Bypass -File \"" + scriptPath + "\" -Fixture") { UseShellExecute = false, CreateNoWindow = true });
                     IntPtr handle = IntPtr.Zero;
@@ -107,42 +121,57 @@ namespace SelectionTranslator
                     Check(!bounds.IsEmpty, "external document exposes UI Automation");
                     int x = (int)(bounds.Left + 30), y = (int)(bounds.Top + 25);
                     window.WindowState = WindowState.Minimized;
-                    Check(SetCursorPos(x, y), "test cursor moves to selection fixture");
-                    mouse_event(0x0002, 0, 0, 0, UIntPtr.Zero);
-                    mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero);
-                    await Task.Delay(100);
-                    Check(Native.GetForegroundWindow() == handle, "mouse activates test fixture");
+                    ClickAt(x, y);
+                    var offer = (Window)Field(window, "selectionButton");
                     var result = (TextBox)Field(window, "translated");
                     var status = (TextBlock)Field(window, "status");
+                    for (int i = 0; i < 100 && !offer.IsVisible; i++) await Task.Delay(100);
+                    Check(offer.IsVisible, "selection shows small translation button");
+                    var offerBounds = WindowBounds(offer);
+                    Check(Math.Abs(offerBounds.Left - x) < 180 && Math.Abs(offerBounds.Top - y) < 100, "button appears beside selected text");
+                    Check(Native.GetForegroundWindow() == handle, "selection button does not steal focus");
+                    await Task.Delay(600);
+                    Check(handler.Translations == 0 && handler.Exchanges == 0, "selection alone never calls Copilot");
+                    Check(result.Text == "" && window.WindowState == WindowState.Minimized, "selection does not open translation frame");
+                    ClickWindow(offer);
                     for (int i = 0; i < 100 && !status.Text.Contains("HTTP 401"); i++) await Task.Delay(100);
-                    Check(status.Text.Contains("HTTP 401") && result.Text == "", "API failure visibly reported");
-                    Check(handler.Translations == 1, "failed request is not automatically retried");
+                    Check(status.Text.Contains("HTTP 401") && result.Text == "", "explicit click reports API failure");
+                    Check(handler.Translations == 1 && !offer.IsVisible, "one click sends one request and dismisses button");
+                    Check(Native.GetForegroundWindow() == handle, "clicking translation button preserves original selection focus");
+                    var resultBounds = WindowBounds(window);
+                    Check(Math.Abs(resultBounds.Left - x) < resultBounds.Width + 30 && Math.Abs(resultBounds.Top - y) < resultBounds.Height + 30, "translation frame appears beside selected text");
+                    Check(window.WindowState == WindowState.Normal, "explicit translation restores minimized frame");
                     handler.Reject = false;
-                    mouse_event(0x0002, 0, 0, 0, UIntPtr.Zero);
-                    mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero);
+                    ClickAt(x, y);
+                    for (int i = 0; i < 100 && !offer.IsVisible; i++) await Task.Delay(100);
+                    Check(offer.IsVisible && handler.Translations == 1, "reselecting only offers button without retrying network");
+                    ClickWindow(offer);
                     for (int i = 0; i < 100 && result.Text != "你好"; i++) await Task.Delay(100);
-                    Check(result.Text == "你好", "mouse release automatically translates external document without a hotkey");
+                    Check(result.Text == "你好", "explicit button translates captured external selection");
                     Check(((TextBox)Field(window, "original")).Text == "hello", "only selected text captured");
-                    Check(handler.Translations == 2, "same selection can be retried after failure");
-                    Check(Native.GetForegroundWindow() == handle, "translation does not steal focus");
-                    Check(window.WindowState == WindowState.Normal, "automatic translation restores minimized window");
-                    Check(GetClipboardSequenceNumber() == clipboardSequence, "automatic translation never modifies clipboard");
-                    mouse_event(0x0002, 0, 0, 0, UIntPtr.Zero);
-                    mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero);
-                    await Task.Delay(1000);
-                    Check(handler.Translations == 2, "unchanged successful selection deduplicated");
-                    Check(status.Text != "正在读取选区…", "deduplication does not leave reading status stuck");
+                    Check(handler.Translations == 2, "second explicit click retries failed translation");
+                    Check(GetClipboardSequenceNumber() == clipboardSequence, "selection/button/translation never modify clipboard");
+                    ClickAt(x, y);
+                    for (int i = 0; i < 100 && !offer.IsVisible; i++) await Task.Delay(100);
+                    Check(offer.IsVisible && handler.Translations == 2, "same successful selection still requires explicit click");
+                    ClickAt((int)bounds.Right - 15, (int)bounds.Bottom + 20);
+                    await Task.Delay(700);
+                    Check(!offer.IsVisible && handler.Translations == 2, "outside click dismisses button without translating");
+                    ClickAt(x, y);
+                    for (int i = 0; i < 100 && !offer.IsVisible; i++) await Task.Delay(100);
+                    Check(offer.IsVisible, "new selection offers button again");
                     auto.IsChecked = false;
-                    Check((IntPtr)Field(window, "mouseHook") == IntPtr.Zero, "mouse hook released on pause");
-                    window.WindowState = WindowState.Minimized;
-                    Check(window.WindowState == WindowState.Minimized, "window minimizes");
+                    Check(!offer.IsVisible && (IntPtr)Field(window, "mouseHook") == IntPtr.Zero, "pause dismisses button and releases mouse hook");
+                    window.Close();
+                    Check(!offer.IsVisible, "exit closes selection button");
                 }
                 catch (Exception error) { failure = error; }
                 finally {
                     if (fixture != null) { if (!fixture.HasExited) { fixture.Kill(); fixture.WaitForExit(3000); } fixture.Dispose(); }
                     SetCursorPos(cursor.X, cursor.Y);
                     SetForegroundWindow(foreground);
-                    window.Close(); File.Delete(path);
+                    if (window.IsVisible) window.Close();
+                    File.Delete(path);
                 }
             };
             timer.Start();
@@ -150,10 +179,16 @@ namespace SelectionTranslator
             if (failure != null) throw failure;
             Check(Native.RegisterHotKey(IntPtr.Zero, 77, 0x4003, 0x54), "hotkey released on exit");
             Native.UnregisterHotKey(IntPtr.Zero, 77);
-            Console.WriteLine("PASS: " + checks + " desktop/selection assertions (mock Copilot, real mouse + cross-process UI Automation)");
+            Console.WriteLine("PASS: " + checks + " desktop/selection assertions (mock Copilot, real selection + button clicks)");
         }
         public static void Run()
         {
+            var work = new Rect(0, 0, 1920, 1080);
+            Check(Native.NearSelection(new Point(100, 100), new Size(490, 500), work) == new Rect(112, 112, 490, 500), "popup beside selection");
+            Check(Native.NearSelection(new Point(1910, 1070), new Size(490, 500), work) == new Rect(1408, 558, 490, 500), "popup flips at right/bottom edges");
+            var leftMonitor = new Rect(-1920, -200, 1920, 1080);
+            Check(leftMonitor.Contains(Native.NearSelection(new Point(-1919, -199), new Size(490, 500), leftMonitor)), "negative-coordinate monitor");
+            Check(Native.NearSelection(new Point(0, 0), new Size(3000, 2000), work) == work, "oversized popup fits work area");
             Check(CopilotClient.ValidateText("  hello  ") == "hello", "trim");
             Throws(() => CopilotClient.ValidateText(" \n"), "empty input");
             Throws(() => CopilotClient.ValidateText(new string('a', 8001)), "oversized selection");

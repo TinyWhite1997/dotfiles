@@ -166,6 +166,52 @@ namespace SelectionTranslator
         [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint processId);
         [DllImport("user32.dll")] public static extern short GetAsyncKeyState(int key);
 
+        [StructLayout(LayoutKind.Sequential)] public struct ScreenPoint { public int X, Y; }
+        [StructLayout(LayoutKind.Sequential)] struct ScreenRect { public int Left, Top, Right, Bottom; }
+        [StructLayout(LayoutKind.Sequential)] struct MonitorInfo { public int Size; public ScreenRect Monitor, Work; public uint Flags; }
+        [DllImport("user32.dll")] public static extern bool GetCursorPos(out ScreenPoint point);
+        [DllImport("user32.dll")] static extern IntPtr MonitorFromPoint(ScreenPoint point, uint flags);
+        [DllImport("user32.dll")] static extern bool GetMonitorInfo(IntPtr monitor, ref MonitorInfo info);
+        [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr window, out ScreenRect rect);
+        [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr window, IntPtr after, int x, int y, int width, int height, uint flags);
+        [DllImport("user32.dll")] static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
+        [DllImport("user32.dll", EntryPoint = "GetWindowLongW")] static extern int GetWindowLong(IntPtr window, int index);
+        [DllImport("user32.dll", EntryPoint = "SetWindowLongW")] static extern int SetWindowLong(IntPtr window, int index, int value);
+        internal static void NoActivate(IntPtr window) { SetWindowLong(window, -20, GetWindowLong(window, -20) | 0x08000080); }
+
+        internal static Rect NearSelection(Point anchor, Size size, Rect work)
+        {
+            double width = Math.Min(size.Width, work.Width), height = Math.Min(size.Height, work.Height);
+            double x = anchor.X + 12, y = anchor.Y + 12;
+            if (x + width > work.Right) x = anchor.X - width - 12;
+            if (y + height > work.Bottom) y = anchor.Y - height - 12;
+            x = Math.Max(work.Left, Math.Min(x, work.Right - width));
+            y = Math.Max(work.Top, Math.Min(y, work.Bottom - height));
+            return new Rect(x, y, width, height);
+        }
+
+        internal static Rect PositionNear(Window window, Point anchor)
+        {
+            if (window.WindowState == WindowState.Minimized) window.WindowState = WindowState.Normal;
+            window.Show();
+            // Mouse/UIA coordinates are physical pixels, including on mixed-DPI monitors.
+            IntPtr previous = SetThreadDpiAwarenessContext(new IntPtr(-4));
+            try
+            {
+                IntPtr handle = new WindowInteropHelper(window).Handle;
+                ScreenRect bounds;
+                var monitor = new MonitorInfo { Size = Marshal.SizeOf(typeof(MonitorInfo)) };
+                var point = new ScreenPoint { X = (int)anchor.X, Y = (int)anchor.Y };
+                if (!GetWindowRect(handle, out bounds) || !GetMonitorInfo(MonitorFromPoint(point, 2), ref monitor)) throw new InvalidOperationException("无法定位翻译窗口。");
+                var work = new Rect(monitor.Work.Left, monitor.Work.Top, monitor.Work.Right - monitor.Work.Left, monitor.Work.Bottom - monitor.Work.Top);
+                Rect position = NearSelection(anchor, new Size(bounds.Right - bounds.Left, bounds.Bottom - bounds.Top), work);
+                if (!SetWindowPos(handle, IntPtr.Zero, (int)position.X, (int)position.Y, (int)position.Width, (int)position.Height, 0x14))
+                    throw new InvalidOperationException("无法定位翻译窗口。");
+                return position;
+            }
+            finally { if (previous != IntPtr.Zero) SetThreadDpiAwarenessContext(previous); }
+        }
+
         public static string ReadSelection(IntPtr foreground, Point? point = null)
         {
             uint pid;
@@ -225,14 +271,20 @@ namespace SelectionTranslator
         readonly TextBox original = new TextBox { AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, Height = 105, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
         readonly TextBox translated = new TextBox { IsReadOnly = true, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
         readonly TextBlock status = new TextBlock { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 8) };
-        readonly CheckBox automatic = new CheckBox { Content = "鼠标划选后自动翻译（选中文本会发送到 Copilot）", Margin = new Thickness(0, 8, 0, 8) };
+        readonly CheckBox automatic = new CheckBox { Content = "划选文字后显示翻译按钮（点击才发送到 Copilot）", Margin = new Thickness(0, 8, 0, 8) };
+        readonly Window selectionButton = new Window { Title = "翻译选中文字", Width = 76, Height = 34, WindowStyle = WindowStyle.None,
+            ResizeMode = ResizeMode.NoResize, Topmost = true, ShowActivated = false, ShowInTaskbar = false, Focusable = false };
+        readonly Button selectionAction = new Button { Content = "翻译", Focusable = false, FontSize = 14 };
         readonly DispatcherTimer debounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(350) };
+        readonly DispatcherTimer offerWatch = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
         readonly Native.MouseProc mouseCallback;
-        IntPtr mouseHook, hwnd;
+        IntPtr mouseHook, hwnd, buttonHwnd, offeredWindow;
         HwndSource source;
         CancellationTokenSource pending;
-        string lastSelection;
-        long generation;
+        string offeredText;
+        Point offeredPoint;
+        Rect offeredBounds;
+        long generation, captureVersion;
         bool readingSelection, closed;
         Point? selectionPoint;
 
@@ -252,7 +304,7 @@ namespace SelectionTranslator
             var header = new StackPanel();
             DockPanel.SetDock(header, Dock.Top); layout.Children.Add(header);
             header.Children.Add(new TextBlock { Text = "划词翻译", FontSize = 23, FontWeight = FontWeights.SemiBold });
-            header.Children.Add(new TextBlock { Text = "划选文字，松开鼠标自动翻译 · " + model, Margin = new Thickness(0, 5, 0, 5) });
+            header.Children.Add(new TextBlock { Text = "划选文字 → 点击附近的翻译按钮 · " + model, Margin = new Thickness(0, 5, 0, 5), TextWrapping = TextWrapping.Wrap });
             header.Children.Add(automatic);
             header.Children.Add(new TextBlock { Text = "原文（也可手动粘贴，最多 8000 字符）" });
             original.MaxLength = CopilotClient.MaxTextLength;
@@ -264,37 +316,64 @@ namespace SelectionTranslator
             buttons.Children.Add(translate); buttons.Children.Add(copy); header.Children.Add(buttons);
             header.Children.Add(status);
             layout.Children.Add(translated);
-            status.Text = "启动后自动翻译；选中文字会发送到 Copilot。关闭窗口即退出。";
+            status.Text = "划选只显示按钮，点击翻译后才发送原文。关闭窗口即退出。";
             translate.Click += async delegate { await Translate(original.Text); };
             copy.Click += delegate {
                 try { if (!String.IsNullOrEmpty(translated.Text)) Clipboard.SetText(translated.Text); }
                 catch (ExternalException) { status.Text = "剪贴板正被占用，请稍后重试。"; }
             };
+            selectionButton.Content = selectionAction;
+            selectionButton.SourceInitialized += delegate {
+                buttonHwnd = new WindowInteropHelper(selectionButton).Handle;
+                Native.NoActivate(buttonHwnd);
+                HwndSource.FromHwnd(buttonHwnd).AddHook(DoNotActivate);
+            };
+            selectionAction.Click += async delegate {
+                string text = offeredText;
+                Point anchor = offeredPoint;
+                DismissOffer();
+                if (text != null) await Translate(text, anchor);
+            };
             automatic.Checked += delegate { EnableAutomatic(); };
-            automatic.Unchecked += delegate { DisableAutomatic(); CancelPending(); status.Text = "自动翻译已暂停。"; };
+            automatic.Unchecked += delegate { DisableAutomatic(); CancelPending(); status.Text = "划词按钮已暂停。"; };
             mouseCallback = OnMouse;
             debounce.Tick += async delegate {
                 debounce.Stop();
                 if (automatic.IsChecked == true) await Capture(true);
             };
+            offerWatch.Tick += delegate {
+                IntPtr foreground = Native.GetForegroundWindow();
+                if (foreground != IntPtr.Zero && foreground != offeredWindow && foreground != buttonHwnd) DismissOffer();
+            };
             SourceInitialized += delegate {
                 hwnd = new WindowInteropHelper(this).Handle;
                 source = HwndSource.FromHwnd(hwnd);
                 source.AddHook(OnMessage);
-                // MOD_NOREPEAT | MOD_CONTROL | MOD_ALT; no keyboard or clipboard injection.
-                if (!Native.RegisterHotKey(hwnd, 1, 0x4003, 0x54))
-                {
-                    status.Text = "Ctrl+Alt+T 已被占用，不影响鼠标划选自动翻译。";
-                }
+                if (!Native.RegisterHotKey(hwnd, 1, 0x4003, 0x54)) status.Text = "Ctrl+Alt+T 已被占用，不影响鼠标划词按钮。";
             };
             Loaded += delegate { automatic.IsChecked = true; };
             Closed += delegate {
                 closed = true;
                 DisableAutomatic(); CancelPending();
+                selectionButton.Close();
                 Native.UnregisterHotKey(hwnd, 1);
                 if (source != null) source.RemoveHook(OnMessage);
                 client.Dispose();
             };
+        }
+
+        static IntPtr DoNotActivate(IntPtr window, int message, IntPtr wparam, IntPtr lparam, ref bool handled)
+        {
+            if (message == 0x0021) { handled = true; return new IntPtr(3); }
+            return IntPtr.Zero;
+        }
+
+        void DismissOffer()
+        {
+            captureVersion++;
+            offeredText = null;
+            offerWatch.Stop();
+            if (selectionButton.IsVisible) selectionButton.Hide();
         }
 
         void CancelPending()
@@ -305,39 +384,42 @@ namespace SelectionTranslator
 
         void EnableAutomatic()
         {
-            lastSelection = null;
             mouseHook = Native.SetWindowsHookEx(14, mouseCallback, Native.GetModuleHandle(null), 0);
-            if (mouseHook == IntPtr.Zero)
-            {
+            if (mouseHook == IntPtr.Zero) {
                 automatic.IsChecked = false;
-                status.Text = "无法监听鼠标划选；仍可使用 Ctrl+Alt+T。";
+                status.Text = "无法监听鼠标划选；仍可使用 Ctrl+Alt+T 显示翻译按钮。";
             }
-            else status.Text = "自动翻译已开启：鼠标释放后读取选区；不要划选机密文本。";
+            else status.Text = "划词按钮已开启：选中文字后点击附近的「翻译」，才会发送原文。";
         }
 
         void DisableAutomatic()
         {
-            debounce.Stop();
+            debounce.Stop(); DismissOffer();
             if (mouseHook != IntPtr.Zero) { Native.UnhookWindowsHookEx(mouseHook); mouseHook = IntPtr.Zero; }
         }
 
         IntPtr OnMouse(int code, IntPtr message, IntPtr data)
         {
-            if (code >= 0 && message.ToInt32() == 0x0202)
+            if (code >= 0 && (message.ToInt32() == 0x0201 || message.ToInt32() == 0x0202))
             {
-                // The hook only schedules work; UI Automation and network I/O never run in it.
-                selectionPoint = new Point(Marshal.ReadInt32(data), Marshal.ReadInt32(data, 4));
-                debounce.Stop(); debounce.Start();
+                var point = new Native.ScreenPoint { X = Marshal.ReadInt32(data), Y = Marshal.ReadInt32(data, 4) };
+                if (!selectionButton.IsVisible || !offeredBounds.Contains(new Point(point.X, point.Y))) {
+                    // Only schedule work in the hook; never read UIA or call the network here.
+                    if (message.ToInt32() == 0x0201) { debounce.Stop(); Dispatcher.BeginInvoke(new Action(DismissOffer)); }
+                    else {
+                        selectionPoint = new Point(point.X, point.Y);
+                        debounce.Stop(); debounce.Start();
+                    }
+                }
             }
             return Native.CallNextHookEx(mouseHook, code, message, data);
         }
 
         IntPtr OnMessage(IntPtr window, int message, IntPtr wparam, IntPtr lparam, ref bool handled)
         {
-            if (message == 0x0312 && wparam.ToInt32() == 1)
-            {
+            if (message == 0x0312 && wparam.ToInt32() == 1) {
                 handled = true;
-                debounce.Stop();
+                debounce.Stop(); DismissOffer();
                 CaptureHotkey();
             }
             return IntPtr.Zero;
@@ -348,64 +430,58 @@ namespace SelectionTranslator
         async Task Capture(bool auto)
         {
             if (readingSelection || closed) return;
-            // Wait for modifiers to be released without blocking the window thread.
             if (!auto)
-                for (int i = 0; i < 50 && ((Native.GetAsyncKeyState(0x11) | Native.GetAsyncKeyState(0x12)) & 0x8000) != 0; i++)
-                    await Task.Delay(20);
+                for (int i = 0; i < 50 && ((Native.GetAsyncKeyState(0x11) | Native.GetAsyncKeyState(0x12)) & 0x8000) != 0; i++) await Task.Delay(20);
             IntPtr foreground = Native.GetForegroundWindow();
             uint pid;
             Native.GetWindowThreadProcessId(foreground, out pid);
             if (foreground == IntPtr.Zero || pid == Process.GetCurrentProcess().Id) return;
-            Point? point = auto ? selectionPoint : null;
-            long capturedGeneration = generation;
+            Native.ScreenPoint cursor; Native.GetCursorPos(out cursor);
+            Point point = auto && selectionPoint.HasValue ? selectionPoint.Value : new Point(cursor.X, cursor.Y);
+            long version = captureVersion;
             readingSelection = true;
-            string text;
-            status.Text = "正在读取选区…";
-            try { text = await Task.Run(() => Native.ReadSelection(foreground, point)); }
-            catch (Exception) { if (!closed) status.Text = "无法读取此应用的选区，请手动粘贴。"; return; }
+            try {
+                string text = await Task.Run(() => Native.ReadSelection(foreground, point));
+                if (closed || version != captureVersion || Native.GetForegroundWindow() != foreground || (auto && automatic.IsChecked != true)) return;
+                if (String.IsNullOrWhiteSpace(text)) { DismissOffer(); status.Text = "未读到选中文字，可将原文手动粘贴到这里。"; return; }
+                text = CopilotClient.ValidateText(text);
+                DismissOffer(); version = captureVersion;
+                offeredText = text; offeredPoint = point; offeredWindow = foreground;
+                offeredBounds = Native.PositionNear(selectionButton, point);
+                offerWatch.Start();
+                status.Text = "已选中文字；点击附近的「翻译」按钮才发送。";
+            }
+            catch (Exception error) {
+                if (!closed && version == captureVersion) { DismissOffer(); status.Text = error is ArgumentException ? error.Message : "无法读取选区，请手动粘贴。"; }
+            }
             finally { readingSelection = false; }
-            if (closed || capturedGeneration != generation || Native.GetForegroundWindow() != foreground || (auto && automatic.IsChecked != true)) return;
-            if (String.IsNullOrWhiteSpace(text)) {
-                lastSelection = null;
-                status.Text = "未读到选中文字：请在支持的应用中划选，或将原文粘贴到这里。";
-                return;
-            }
-            string key = foreground.ToString() + ":" + text;
-            if (auto && key == lastSelection) {
-                status.Text = pending != null ? "正在翻译…" : "相同选区，已跳过重复请求。";
-                return;
-            }
-            lastSelection = key;
-            await Translate(text);
         }
 
-        async Task Translate(string text)
+        async Task Translate(string text, Point? anchor = null)
         {
-            CancelPending();
+            DismissOffer(); CancelPending();
             long requestGeneration = generation;
             var cancellation = new CancellationTokenSource();
             pending = cancellation;
-            try
-            {
+            try {
                 text = CopilotClient.ValidateText(text);
                 original.Text = text;
                 translated.Clear();
                 if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
                 Show();
+                if (anchor.HasValue) Native.PositionNear(this, anchor.Value);
                 status.Text = "正在翻译…";
                 string answer = await client.TranslateAsync(text, cancellation.Token);
                 if (!closed && requestGeneration == generation) { translated.Text = answer; status.Text = "翻译完成"; }
             }
-            catch (OperationCanceledException) { if (!closed && requestGeneration == generation) { lastSelection = null; status.Text = "请求超时，请重新划选重试。"; } }
+            catch (OperationCanceledException) { if (!closed && requestGeneration == generation) status.Text = "请求超时，请点击翻译重试。"; }
             catch (Exception error) {
                 if (!closed && requestGeneration == generation) {
-                    lastSelection = null;
                     status.Text = error is ArgumentException || error is InvalidOperationException ? error.Message : "翻译失败，请检查网络和登录凭据。";
                     if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
                 }
             }
-            finally
-            {
+            finally {
                 if (pending == cancellation) pending = null;
                 cancellation.Dispose();
             }
@@ -416,8 +492,7 @@ namespace SelectionTranslator
         {
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
             bool created;
-            using (var singleton = new Mutex(true, "Local\\SelectionTranslator", out created))
-            {
+            using (var singleton = new Mutex(true, "Local\\SelectionTranslator", out created)) {
                 if (!created) { MessageBox.Show("划词翻译已经运行，请查看任务栏中的翻译窗口。", "划词翻译"); return; }
                 try { new Application().Run(new Desktop(authPath, model)); }
                 finally { singleton.ReleaseMutex(); }
