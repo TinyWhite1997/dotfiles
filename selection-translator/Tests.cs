@@ -73,16 +73,28 @@ namespace SelectionTranslator
         {
             return AutomationElement.FromHandle(new WindowInteropHelper(window).Handle).Current.BoundingRectangle;
         }
-        static void ClickAt(int x, int y)
+        static async Task ClickAt(int x, int y)
         {
             Check(SetCursorPos(x, y), "test cursor moves");
+            await Task.Delay(60);
             mouse_event(0x0002, 0, 0, 0, UIntPtr.Zero);
+            await Task.Delay(60);
             mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero);
+            await Task.Delay(60);
         }
-        static void ClickWindow(Window window)
+        static async Task ClickWindow(Window window)
         {
             var bounds = WindowBounds(window);
-            ClickAt((int)(bounds.Left + bounds.Width / 2), (int)(bounds.Top + bounds.Height / 2));
+            await ClickAt((int)(bounds.Left + bounds.Width / 2), (int)(bounds.Top + bounds.Height / 2));
+        }
+        static void SavePreview(Window window, string name)
+        {
+            window.UpdateLayout();
+            var image = new System.Windows.Media.Imaging.RenderTargetBitmap((int)window.ActualWidth, (int)window.ActualHeight, 96, 96, PixelFormats.Pbgra32);
+            image.Render(window);
+            var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+            encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(image));
+            using (var file = File.Create(Path.Combine(Path.GetTempPath(), name))) encoder.Save(file);
         }
         public static void Smoke(string scriptPath)
         {
@@ -96,7 +108,7 @@ namespace SelectionTranslator
             window.WindowStartupLocation = WindowStartupLocation.Manual;
             window.Left = SystemParameters.WorkArea.Right - window.Width;
             window.Top = SystemParameters.WorkArea.Bottom - window.Height;
-            var app = new Application();
+            var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
             Exception failure = null;
             Process fixture = null;
             var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
@@ -106,8 +118,13 @@ namespace SelectionTranslator
                     Check(window.IsVisible && window.Topmost && !window.ShowActivated, "visible non-activating floating window");
                     Check(Native.GetForegroundWindow() == foreground, "startup preserves foreground");
                     Check(!Native.RegisterHotKey(IntPtr.Zero, 77, 0x4003, 0x54), "app owns Ctrl+Alt+T");
-                    var auto = (CheckBox)Field(window, "automatic");
-                    Check(auto.IsChecked == true, "selection button detection enabled on startup");
+                    var pause = (System.Windows.Forms.ToolStripMenuItem)Field(window, "pauseMenu");
+                    var tray = (System.Windows.Forms.NotifyIcon)Field(window, "tray");
+                    Check((bool)Field(window, "detectionEnabled") && !pause.Checked, "selection button detection enabled on startup");
+                    Check(tray.Visible && tray.Icon != null, "tray icon registered on startup");
+                    Check(window.WindowStyle == WindowStyle.None && window.AllowsTransparency && !window.ShowInTaskbar, "borderless background app without taskbar clutter");
+                    var card = (Border)window.Content;
+                    Check(card.CornerRadius.TopLeft == 16 && card.Background == Brushes.White, "white rounded translation card");
                     Check((IntPtr)Field(window, "mouseHook") != IntPtr.Zero, "mouse hook installed on startup");
                     fixture = Process.Start(new ProcessStartInfo("powershell.exe", "-NoProfile -STA -ExecutionPolicy Bypass -File \"" + scriptPath + "\" -Fixture") { UseShellExecute = false, CreateNoWindow = true });
                     IntPtr handle = IntPtr.Zero;
@@ -120,8 +137,10 @@ namespace SelectionTranslator
                     var bounds = box.Current.BoundingRectangle;
                     Check(!bounds.IsEmpty, "external document exposes UI Automation");
                     int x = (int)(bounds.Left + 30), y = (int)(bounds.Top + 25);
-                    window.WindowState = WindowState.Minimized;
-                    ClickAt(x, y);
+                    window.Close();
+                    Check(!window.IsVisible && !(bool)Field(window, "closed") && tray.Visible, "close hides to tray instead of exiting");
+                    Check((IntPtr)Field(window, "mouseHook") != IntPtr.Zero, "close preserves background selection listener");
+                    await ClickAt(x, y);
                     var offer = (Window)Field(window, "selectionButton");
                     var result = (TextBox)Field(window, "translated");
                     var status = (TextBlock)Field(window, "status");
@@ -132,45 +151,64 @@ namespace SelectionTranslator
                     Check(Native.GetForegroundWindow() == handle, "selection button does not steal focus");
                     await Task.Delay(600);
                     Check(handler.Translations == 0 && handler.Exchanges == 0, "selection alone never calls Copilot");
-                    Check(result.Text == "" && window.WindowState == WindowState.Minimized, "selection does not open translation frame");
-                    ClickWindow(offer);
+                    Check(result.Text == "" && !window.IsVisible, "selection does not reveal hidden translation frame");
+                    await ClickWindow(offer);
                     for (int i = 0; i < 100 && !status.Text.Contains("HTTP 401"); i++) await Task.Delay(100);
                     Check(status.Text.Contains("HTTP 401") && result.Text == "", "explicit click reports API failure");
                     Check(handler.Translations == 1 && !offer.IsVisible, "one click sends one request and dismisses button");
                     Check(Native.GetForegroundWindow() == handle, "clicking translation button preserves original selection focus");
                     var resultBounds = WindowBounds(window);
                     Check(Math.Abs(resultBounds.Left - x) < resultBounds.Width + 30 && Math.Abs(resultBounds.Top - y) < resultBounds.Height + 30, "translation frame appears beside selected text");
-                    Check(window.WindowState == WindowState.Normal, "explicit translation restores minimized frame");
+                    Check(window.IsVisible && window.WindowState == WindowState.Normal, "explicit translation restores tray-hidden frame");
                     handler.Reject = false;
-                    ClickAt(x, y);
+                    await ClickAt(x, y);
                     for (int i = 0; i < 100 && !offer.IsVisible; i++) await Task.Delay(100);
                     Check(offer.IsVisible && handler.Translations == 1, "reselecting only offers button without retrying network");
-                    ClickWindow(offer);
+                    await ClickWindow(offer);
                     for (int i = 0; i < 100 && result.Text != "你好"; i++) await Task.Delay(100);
                     Check(result.Text == "你好", "explicit button translates captured external selection");
-                    Check(((TextBox)Field(window, "original")).Text == "hello", "only selected text captured");
+                    var edits = AutomationElement.FromHandle(new WindowInteropHelper(window).Handle).FindAll(TreeScope.Descendants,
+                        new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Edit));
+                    Check(edits.Count == 1 && result.IsReadOnly, "only translated result is displayed, no source input");
+                    Check(result.BorderThickness == new Thickness(0) && ((Button)Field(window, "copy")).IsEnabled, "borderless result with enabled copy action");
+                    var action = (Button)Field(window, "selectionAction");
+                    action.ApplyTemplate();
+                    Check(((Border)action.Template.FindName("surface", action)).CornerRadius.TopLeft == 9, "translation button has rounded corners");
+                    Check(window.Height < 200, "short translation uses compact card instead of empty large frame");
+                    var firstLine = result.GetRectFromCharacterIndex(0);
+                    Check(firstLine.Height > 0 && firstLine.Bottom <= result.ActualHeight, "compact result does not clip the first line");
+                    SavePreview(window, "selection-translator-result.png");
                     Check(handler.Translations == 2, "second explicit click retries failed translation");
                     Check(GetClipboardSequenceNumber() == clipboardSequence, "selection/button/translation never modify clipboard");
-                    ClickAt(x, y);
+                    await ClickAt(x, y);
                     for (int i = 0; i < 100 && !offer.IsVisible; i++) await Task.Delay(100);
                     Check(offer.IsVisible && handler.Translations == 2, "same successful selection still requires explicit click");
-                    ClickAt((int)bounds.Right - 15, (int)bounds.Bottom + 20);
+                    await ClickAt((int)bounds.Right - 15, (int)bounds.Bottom + 20);
                     await Task.Delay(700);
                     Check(!offer.IsVisible && handler.Translations == 2, "outside click dismisses button without translating");
-                    ClickAt(x, y);
+                    await ClickAt(x, y);
                     for (int i = 0; i < 100 && !offer.IsVisible; i++) await Task.Delay(100);
                     Check(offer.IsVisible, "new selection offers button again");
-                    auto.IsChecked = false;
-                    Check(!offer.IsVisible && (IntPtr)Field(window, "mouseHook") == IntPtr.Zero, "pause dismisses button and releases mouse hook");
+                    SavePreview(offer, "selection-translator-button.png");
+                    pause.PerformClick();
+                    Check(pause.Checked && !offer.IsVisible && (IntPtr)Field(window, "mouseHook") == IntPtr.Zero, "tray pause dismisses button and releases mouse hook");
+                    pause.PerformClick();
+                    Check(!pause.Checked && (IntPtr)Field(window, "mouseHook") != IntPtr.Zero, "tray resume restores selection listener");
                     window.Close();
-                    Check(!offer.IsVisible, "exit closes selection button");
+                    ((System.Windows.Forms.ToolStripMenuItem)Field(window, "showMenu")).PerformClick();
+                    Check(window.IsVisible, "tray show command restores translation window");
+                    window.Close();
+                    Check(tray.Visible && !(bool)Field(window, "closed"), "closing again still keeps app running");
+                    ((System.Windows.Forms.ToolStripMenuItem)Field(window, "exitMenu")).PerformClick();
+                    Check(!offer.IsVisible && !tray.Visible && (bool)Field(window, "closed"), "tray exit closes windows and removes tray icon");
+                    Check((IntPtr)Field(window, "mouseHook") == IntPtr.Zero, "tray exit releases mouse hook");
                 }
                 catch (Exception error) { failure = error; }
                 finally {
                     if (fixture != null) { if (!fixture.HasExited) { fixture.Kill(); fixture.WaitForExit(3000); } fixture.Dispose(); }
                     SetCursorPos(cursor.X, cursor.Y);
                     SetForegroundWindow(foreground);
-                    if (window.IsVisible) window.Close();
+                    if (!(bool)Field(window, "closed")) window.Exit();
                     File.Delete(path);
                 }
             };

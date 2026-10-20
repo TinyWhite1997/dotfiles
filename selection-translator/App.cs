@@ -268,13 +268,21 @@ namespace SelectionTranslator
     public sealed class Desktop : Window
     {
         readonly CopilotClient client;
-        readonly TextBox original = new TextBox { AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, Height = 105, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
-        readonly TextBox translated = new TextBox { IsReadOnly = true, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
-        readonly TextBlock status = new TextBlock { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 8) };
-        readonly CheckBox automatic = new CheckBox { Content = "划选文字后显示翻译按钮（点击才发送到 Copilot）", Margin = new Thickness(0, 8, 0, 8) };
-        readonly Window selectionButton = new Window { Title = "翻译选中文字", Width = 76, Height = 34, WindowStyle = WindowStyle.None,
-            ResizeMode = ResizeMode.NoResize, Topmost = true, ShowActivated = false, ShowInTaskbar = false, Focusable = false };
-        readonly Button selectionAction = new Button { Content = "翻译", Focusable = false, FontSize = 14 };
+        readonly TextBox translated = new TextBox { IsReadOnly = true, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto, BorderThickness = new Thickness(0), Background = Brushes.White,
+            Foreground = new SolidColorBrush(Color.FromRgb(38, 41, 46)), FontSize = 17, Padding = new Thickness(0), IsReadOnlyCaretVisible = false };
+        readonly TextBlock status = new TextBlock { TextWrapping = TextWrapping.Wrap, Foreground = Brushes.Gray, FontSize = 12, Margin = new Thickness(0, 12, 0, 0) };
+        readonly Button copy = new Button { Content = "复制", IsEnabled = false, ToolTip = "复制译文" };
+        readonly Window selectionButton = new Window { Title = "翻译选中文字", Width = 92, Height = 48, WindowStyle = WindowStyle.None,
+            AllowsTransparency = true, Background = Brushes.Transparent, ResizeMode = ResizeMode.NoResize, Topmost = true,
+            ShowActivated = false, ShowInTaskbar = false, Focusable = false };
+        readonly Button selectionAction = new Button { Content = "翻译", Focusable = false, FontSize = 14, Margin = new Thickness(6) };
+        readonly System.Windows.Forms.NotifyIcon tray = new System.Windows.Forms.NotifyIcon();
+        readonly System.Windows.Forms.ContextMenuStrip trayMenu = new System.Windows.Forms.ContextMenuStrip();
+        readonly System.Windows.Forms.ToolStripMenuItem pauseMenu = new System.Windows.Forms.ToolStripMenuItem("暂停划词") { CheckOnClick = true };
+        readonly System.Windows.Forms.ToolStripMenuItem showMenu = new System.Windows.Forms.ToolStripMenuItem("显示译文");
+        readonly System.Windows.Forms.ToolStripMenuItem exitMenu = new System.Windows.Forms.ToolStripMenuItem("退出");
+        readonly System.Drawing.Icon trayIcon;
         readonly DispatcherTimer debounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(350) };
         readonly DispatcherTimer offerWatch = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
         readonly Native.MouseProc mouseCallback;
@@ -285,41 +293,87 @@ namespace SelectionTranslator
         Point offeredPoint;
         Rect offeredBounds;
         long generation, captureVersion;
-        bool readingSelection, closed;
+        bool readingSelection, closed, exiting;
+        bool detectionEnabled = true;
         Point? selectionPoint;
+
+        static Style RoundedButtonStyle()
+        {
+            return (Style)System.Windows.Markup.XamlReader.Parse(@"
+<Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Button'>
+  <Setter Property='Background' Value='White'/><Setter Property='Foreground' Value='#30343B'/>
+  <Setter Property='Padding' Value='12,7'/><Setter Property='Cursor' Value='Hand'/>
+  <Setter Property='BorderThickness' Value='0'/><Setter Property='FontSize' Value='13'/>
+  <Setter Property='Template'><Setter.Value><ControlTemplate TargetType='Button'>
+    <Border x:Name='surface' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml'
+      Background='{TemplateBinding Background}' CornerRadius='9' Padding='{TemplateBinding Padding}'>
+      <ContentPresenter HorizontalAlignment='Center' VerticalAlignment='Center' RecognizesAccessKey='True'/>
+    </Border>
+    <ControlTemplate.Triggers>
+      <Trigger Property='IsMouseOver' Value='True'><Setter TargetName='surface' Property='Background' Value='#F1F3F5'/></Trigger>
+      <Trigger Property='IsPressed' Value='True'><Setter TargetName='surface' Property='Background' Value='#E5E8ED'/></Trigger>
+      <Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='surface' Property='Background' Value='#E9EEF7'/></Trigger>
+      <Trigger Property='IsEnabled' Value='False'><Setter Property='Opacity' Value='0.4'/></Trigger>
+    </ControlTemplate.Triggers>
+  </ControlTemplate></Setter.Value></Setter>
+</Style>");
+        }
+
+        static System.Windows.Media.Effects.DropShadowEffect Shadow(double blur, double opacity)
+        {
+            return new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = blur, ShadowDepth = 2, Opacity = opacity, Color = Colors.Black };
+        }
 
         internal Desktop(string authPath, string model) : this(new CopilotClient(authPath, model), model) { }
         internal Desktop(CopilotClient client, string model)
         {
             this.client = client;
             Title = "划词翻译 · Copilot Luna";
-            Width = 490; Height = 500; MinWidth = 380; MinHeight = 380;
-            Topmost = true;
-            ShowActivated = false;
+            Width = 460; Height = 180;
+            WindowStyle = WindowStyle.None; ResizeMode = ResizeMode.NoResize;
+            AllowsTransparency = true; Background = Brushes.Transparent;
+            Topmost = true; ShowActivated = false; ShowInTaskbar = false;
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
-            FontFamily = new FontFamily("Segoe UI"); FontSize = 14;
-            Background = new SolidColorBrush(Color.FromRgb(247, 249, 252));
-            var layout = new DockPanel { Margin = new Thickness(18) };
-            Content = layout;
-            var header = new StackPanel();
+            FontFamily = new FontFamily("Segoe UI, Microsoft YaHei UI"); FontSize = 14;
+            TextOptions.SetTextFormattingMode(this, TextFormattingMode.Display);
+            var style = RoundedButtonStyle();
+            copy.Style = style;
+            selectionAction.Style = style;
+            selectionAction.Effect = Shadow(10, 0.14);
+            var card = new Border { Background = Brushes.White, CornerRadius = new CornerRadius(16), Margin = new Thickness(12),
+                Padding = new Thickness(22, 15, 22, 22), Effect = Shadow(22, 0.13) };
+            Content = card;
+            var layout = new DockPanel(); card.Child = layout;
+            var header = new DockPanel { Margin = new Thickness(0, 0, 0, 15) };
             DockPanel.SetDock(header, Dock.Top); layout.Children.Add(header);
-            header.Children.Add(new TextBlock { Text = "划词翻译", FontSize = 23, FontWeight = FontWeights.SemiBold });
-            header.Children.Add(new TextBlock { Text = "划选文字 → 点击附近的翻译按钮 · " + model, Margin = new Thickness(0, 5, 0, 5), TextWrapping = TextWrapping.Wrap });
-            header.Children.Add(automatic);
-            header.Children.Add(new TextBlock { Text = "原文（也可手动粘贴，最多 8000 字符）" });
-            original.MaxLength = CopilotClient.MaxTextLength;
-            original.Margin = new Thickness(0, 5, 0, 8);
-            header.Children.Add(original);
-            var buttons = new StackPanel { Orientation = Orientation.Horizontal };
-            var translate = new Button { Content = "翻译", Padding = new Thickness(15, 5, 15, 5) };
-            var copy = new Button { Content = "复制译文", Margin = new Thickness(8, 0, 0, 0), Padding = new Thickness(12, 5, 12, 5) };
-            buttons.Children.Add(translate); buttons.Children.Add(copy); header.Children.Add(buttons);
-            header.Children.Add(status);
+            var close = new Button { Content = "×", ToolTip = "关闭到系统托盘", Style = style, FontSize = 21, Padding = new Thickness(10, 1, 10, 3) };
+            AutomationProperties.SetName(close, "关闭到系统托盘");
+            DockPanel.SetDock(close, Dock.Right); header.Children.Add(close);
+            DockPanel.SetDock(copy, Dock.Right); header.Children.Add(copy);
+            var title = new TextBlock { Text = "译文", FontSize = 15, FontWeight = FontWeights.SemiBold,
+                Foreground = new SolidColorBrush(Color.FromRgb(70, 75, 84)), VerticalAlignment = VerticalAlignment.Center };
+            header.Children.Add(title);
+            header.MouseLeftButtonDown += delegate(object sender, System.Windows.Input.MouseButtonEventArgs e) {
+                if (e.OriginalSource == title || e.OriginalSource == header) DragMove();
+            };
+            var statusStyle = new Style(typeof(TextBlock));
+            var emptyStatus = new Trigger { Property = TextBlock.TextProperty, Value = "" };
+            emptyStatus.Setters.Add(new Setter(UIElement.VisibilityProperty, Visibility.Collapsed));
+            statusStyle.Triggers.Add(emptyStatus); status.Style = statusStyle;
+            DockPanel.SetDock(status, Dock.Bottom); layout.Children.Add(status);
             layout.Children.Add(translated);
-            status.Text = "划选只显示按钮，点击翻译后才发送原文。关闭窗口即退出。";
-            translate.Click += async delegate { await Translate(original.Text); };
-            copy.Click += delegate {
-                try { if (!String.IsNullOrEmpty(translated.Text)) Clipboard.SetText(translated.Text); }
+            translated.SetValue(TextBlock.LineHeightProperty, 27.0);
+            AutomationProperties.SetName(translated, "翻译结果");
+            status.Text = "选中文字，点击附近的翻译按钮。关闭此窗口后仍在托盘运行。";
+            close.Click += delegate { Close(); };
+            copy.Click += async delegate {
+                try {
+                    if (!String.IsNullOrEmpty(translated.Text)) {
+                        Clipboard.SetText(translated.Text); status.Text = "已复制";
+                        await Task.Delay(1200);
+                        if (!closed && status.Text == "已复制") status.Text = "";
+                    }
+                }
                 catch (ExternalException) { status.Text = "剪贴板正被占用，请稍后重试。"; }
             };
             selectionButton.Content = selectionAction;
@@ -334,12 +388,24 @@ namespace SelectionTranslator
                 DismissOffer();
                 if (text != null) await Translate(text, anchor);
             };
-            automatic.Checked += delegate { EnableAutomatic(); };
-            automatic.Unchecked += delegate { DisableAutomatic(); CancelPending(); status.Text = "划词按钮已暂停。"; };
+            trayIcon = CreateTrayIcon();
+            tray.Icon = trayIcon; tray.Text = "划词翻译 · 点击按钮才发送原文";
+            trayMenu.Items.Add(showMenu); trayMenu.Items.Add(pauseMenu);
+            trayMenu.Items.Add(new System.Windows.Forms.ToolStripSeparator()); trayMenu.Items.Add(exitMenu);
+            tray.ContextMenuStrip = trayMenu;
+            showMenu.Click += delegate { ShowResult(); };
+            tray.DoubleClick += delegate { ShowResult(); };
+            pauseMenu.CheckedChanged += delegate {
+                detectionEnabled = !pauseMenu.Checked;
+                tray.Text = detectionEnabled ? "划词翻译 · 点击按钮才发送原文" : "划词翻译 · 已暂停";
+                if (detectionEnabled) EnableAutomatic();
+                else { DisableAutomatic(); CancelPending(); status.Text = "划词已暂停，可从托盘菜单恢复。"; }
+            };
+            exitMenu.Click += delegate { Exit(); };
             mouseCallback = OnMouse;
             debounce.Tick += async delegate {
                 debounce.Stop();
-                if (automatic.IsChecked == true) await Capture(true);
+                if (detectionEnabled) await Capture(true);
             };
             offerWatch.Tick += delegate {
                 IntPtr foreground = Native.GetForegroundWindow();
@@ -351,16 +417,58 @@ namespace SelectionTranslator
                 source.AddHook(OnMessage);
                 if (!Native.RegisterHotKey(hwnd, 1, 0x4003, 0x54)) status.Text = "Ctrl+Alt+T 已被占用，不影响鼠标划词按钮。";
             };
-            Loaded += delegate { automatic.IsChecked = true; };
+            Loaded += delegate { if (mouseHook == IntPtr.Zero && detectionEnabled) EnableAutomatic(); tray.Visible = true; };
+            Closing += delegate(object sender, System.ComponentModel.CancelEventArgs e) {
+                if (!exiting) { e.Cancel = true; DismissOffer(); Hide(); }
+            };
+            StateChanged += delegate { if (WindowState == WindowState.Minimized) { DismissOffer(); Hide(); } };
+            PreviewKeyDown += delegate(object sender, System.Windows.Input.KeyEventArgs e) {
+                if (e.Key == System.Windows.Input.Key.Escape) { Close(); e.Handled = true; }
+            };
             Closed += delegate {
                 closed = true;
                 DisableAutomatic(); CancelPending();
                 selectionButton.Close();
                 Native.UnregisterHotKey(hwnd, 1);
                 if (source != null) source.RemoveHook(OnMessage);
+                tray.Visible = false; tray.Dispose(); trayMenu.Dispose(); trayIcon.Dispose();
                 client.Dispose();
+                if (Application.Current.ShutdownMode == ShutdownMode.OnExplicitShutdown) Application.Current.Shutdown();
             };
         }
+
+        [DllImport("user32.dll")] static extern bool DestroyIcon(IntPtr icon);
+        static System.Drawing.Icon CreateTrayIcon()
+        {
+            using (var image = new System.Drawing.Bitmap(32, 32))
+            using (var graphics = System.Drawing.Graphics.FromImage(image))
+            using (var fill = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(44, 48, 54)))
+            using (var font = new System.Drawing.Font("Microsoft YaHei UI", 14, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Pixel))
+            using (var format = new System.Drawing.StringFormat { Alignment = System.Drawing.StringAlignment.Center, LineAlignment = System.Drawing.StringAlignment.Center }) {
+                graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                graphics.FillEllipse(fill, 1, 1, 30, 30);
+                graphics.DrawString("译", font, System.Drawing.Brushes.White, new System.Drawing.RectangleF(0, 0, 32, 32), format);
+                IntPtr handle = image.GetHicon();
+                try { using (var icon = System.Drawing.Icon.FromHandle(handle)) return (System.Drawing.Icon)icon.Clone(); }
+                finally { DestroyIcon(handle); }
+            }
+        }
+
+        void ShowResult()
+        {
+            WindowState = WindowState.Normal;
+            Show(); Activate();
+        }
+
+        void FitResult(string text)
+        {
+            var measurement = new TextBlock { Text = text, FontFamily = FontFamily, FontSize = translated.FontSize,
+                TextWrapping = TextWrapping.Wrap, LineHeight = 27 };
+            measurement.Measure(new Size(Width - 68, Double.PositiveInfinity));
+            Height = Math.Max(150, Math.Min(400, measurement.DesiredSize.Height + 106));
+        }
+
+        internal void Exit() { exiting = true; Close(); }
 
         static IntPtr DoNotActivate(IntPtr window, int message, IntPtr wparam, IntPtr lparam, ref bool handled)
         {
@@ -386,10 +494,10 @@ namespace SelectionTranslator
         {
             mouseHook = Native.SetWindowsHookEx(14, mouseCallback, Native.GetModuleHandle(null), 0);
             if (mouseHook == IntPtr.Zero) {
-                automatic.IsChecked = false;
-                status.Text = "无法监听鼠标划选；仍可使用 Ctrl+Alt+T 显示翻译按钮。";
+                detectionEnabled = false; pauseMenu.Checked = true;
+                status.Text = "无法监听鼠标，请从托盘菜单恢复划词后重试。";
             }
-            else status.Text = "划词按钮已开启：选中文字后点击附近的「翻译」，才会发送原文。";
+            else status.Text = translated.Text.Length == 0 ? "选中文字，再点击附近的「翻译」。" : "";
         }
 
         void DisableAutomatic()
@@ -417,7 +525,7 @@ namespace SelectionTranslator
 
         IntPtr OnMessage(IntPtr window, int message, IntPtr wparam, IntPtr lparam, ref bool handled)
         {
-            if (message == 0x0312 && wparam.ToInt32() == 1) {
+            if (message == 0x0312 && wparam.ToInt32() == 1 && detectionEnabled) {
                 handled = true;
                 debounce.Stop(); DismissOffer();
                 CaptureHotkey();
@@ -442,17 +550,17 @@ namespace SelectionTranslator
             readingSelection = true;
             try {
                 string text = await Task.Run(() => Native.ReadSelection(foreground, point));
-                if (closed || version != captureVersion || Native.GetForegroundWindow() != foreground || (auto && automatic.IsChecked != true)) return;
-                if (String.IsNullOrWhiteSpace(text)) { DismissOffer(); status.Text = "未读到选中文字，可将原文手动粘贴到这里。"; return; }
+                if (closed || version != captureVersion || Native.GetForegroundWindow() != foreground || (auto && !detectionEnabled)) return;
+                if (String.IsNullOrWhiteSpace(text)) { DismissOffer(); return; }
                 text = CopilotClient.ValidateText(text);
                 DismissOffer(); version = captureVersion;
                 offeredText = text; offeredPoint = point; offeredWindow = foreground;
                 offeredBounds = Native.PositionNear(selectionButton, point);
                 offerWatch.Start();
-                status.Text = "已选中文字；点击附近的「翻译」按钮才发送。";
+                if (translated.Text.Length == 0) status.Text = "点击选区附近的「翻译」。";
             }
             catch (Exception error) {
-                if (!closed && version == captureVersion) { DismissOffer(); status.Text = error is ArgumentException ? error.Message : "无法读取选区，请手动粘贴。"; }
+                if (!closed && version == captureVersion) { DismissOffer(); status.Text = error is ArgumentException ? error.Message : "此应用未提供可读取的选区。"; }
             }
             finally { readingSelection = false; }
         }
@@ -465,14 +573,17 @@ namespace SelectionTranslator
             pending = cancellation;
             try {
                 text = CopilotClient.ValidateText(text);
-                original.Text = text;
-                translated.Clear();
+                translated.Clear(); copy.IsEnabled = false; Height = 180;
                 if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
                 Show();
                 if (anchor.HasValue) Native.PositionNear(this, anchor.Value);
                 status.Text = "正在翻译…";
                 string answer = await client.TranslateAsync(text, cancellation.Token);
-                if (!closed && requestGeneration == generation) { translated.Text = answer; status.Text = "翻译完成"; }
+                if (!closed && requestGeneration == generation) {
+                    translated.Text = answer; copy.IsEnabled = true; status.Text = "";
+                    FitResult(answer);
+                    if (anchor.HasValue && IsVisible) Native.PositionNear(this, anchor.Value);
+                }
             }
             catch (OperationCanceledException) { if (!closed && requestGeneration == generation) status.Text = "请求超时，请点击翻译重试。"; }
             catch (Exception error) {
@@ -493,8 +604,13 @@ namespace SelectionTranslator
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
             bool created;
             using (var singleton = new Mutex(true, "Local\\SelectionTranslator", out created)) {
-                if (!created) { MessageBox.Show("划词翻译已经运行，请查看任务栏中的翻译窗口。", "划词翻译"); return; }
-                try { new Application().Run(new Desktop(authPath, model)); }
+                if (!created) { MessageBox.Show("划词翻译已在后台运行，请从系统托盘的「译」图标打开。", "划词翻译"); return; }
+                try {
+                    var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+                    var window = new Desktop(authPath, model);
+                    app.SessionEnding += delegate { window.exiting = true; };
+                    app.Run(window);
+                }
                 finally { singleton.ReleaseMutex(); }
             }
         }
