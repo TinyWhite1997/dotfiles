@@ -356,8 +356,8 @@ namespace SelectionTranslator
         readonly Window selectionButton = new Window { Title = "复制或翻译选中文字", Width = 160, Height = 48, WindowStyle = WindowStyle.None,
             AllowsTransparency = true, Background = Brushes.Transparent, ResizeMode = ResizeMode.NoResize, Topmost = true,
             ShowActivated = false, ShowInTaskbar = false, Focusable = false };
-        readonly Button selectionCopy = new Button { Content = "复制", ToolTip = "复制原文", Focusable = false, FontSize = 14, Margin = new Thickness(1, 0, 1, 0) };
-        readonly Button selectionAction = new Button { Content = "翻译", ToolTip = "流式翻译", Focusable = false, FontSize = 14, Margin = new Thickness(1, 0, 1, 0) };
+        readonly Button selectionCopy = new Button { Content = "复制", ToolTip = "复制原文", Focusable = false, FontSize = 14, Margin = new Thickness(0) };
+        readonly Button selectionAction = new Button { Content = "翻译", ToolTip = "流式翻译", Focusable = false, FontSize = 14, Margin = new Thickness(0) };
         readonly System.Windows.Forms.NotifyIcon tray = new System.Windows.Forms.NotifyIcon();
         readonly System.Windows.Forms.ContextMenuStrip trayMenu = new System.Windows.Forms.ContextMenuStrip();
         readonly System.Windows.Forms.ToolStripMenuItem pauseMenu = new System.Windows.Forms.ToolStripMenuItem("暂停划词") { CheckOnClick = true };
@@ -378,7 +378,7 @@ namespace SelectionTranslator
         bool detectionEnabled = true;
         Point? selectionPoint;
 
-        static Style RoundedButtonStyle()
+        static Style RoundedButtonStyle(string corners = "9")
         {
             return (Style)System.Windows.Markup.XamlReader.Parse(@"
 <Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Button'>
@@ -387,7 +387,7 @@ namespace SelectionTranslator
   <Setter Property='BorderThickness' Value='0'/><Setter Property='FontSize' Value='13'/>
   <Setter Property='Template'><Setter.Value><ControlTemplate TargetType='Button'>
     <Border x:Name='surface' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml'
-      Background='{TemplateBinding Background}' CornerRadius='9' Padding='{TemplateBinding Padding}'>
+      Background='{TemplateBinding Background}' CornerRadius='" + corners + @"' Padding='{TemplateBinding Padding}'>
       <ContentPresenter HorizontalAlignment='Center' VerticalAlignment='Center' RecognizesAccessKey='True'/>
     </Border>
     <ControlTemplate.Triggers>
@@ -420,8 +420,8 @@ namespace SelectionTranslator
             TextOptions.SetTextFormattingMode(this, TextFormattingMode.Display);
             var style = RoundedButtonStyle();
             copy.Style = style;
-            selectionCopy.Style = style; selectionCopy.Effect = Shadow(10, 0.14);
-            selectionAction.Style = style; selectionAction.Effect = Shadow(10, 0.14);
+            selectionCopy.Style = RoundedButtonStyle("9,0,0,9");
+            selectionAction.Style = RoundedButtonStyle("0,9,9,0");
             var card = new Border { Background = Brushes.White, CornerRadius = new CornerRadius(16), Margin = new Thickness(12),
                 Padding = new Thickness(22, 15, 22, 22), Effect = Shadow(22, 0.13) };
             Content = card;
@@ -458,10 +458,17 @@ namespace SelectionTranslator
                 }
                 catch (ExternalException) { status.Text = "剪贴板正被占用，请稍后重试。"; }
             };
-            var selectionBar = new System.Windows.Controls.Primitives.UniformGrid { Columns = 2, Margin = new Thickness(6) };
+            var selectionBar = new Grid();
+            selectionBar.ColumnDefinitions.Add(new ColumnDefinition());
+            selectionBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            selectionBar.ColumnDefinitions.Add(new ColumnDefinition());
             selectionBar.Children.Add(selectionCopy);
-            selectionBar.Children.Add(selectionAction);
-            selectionButton.Content = selectionBar;
+            var separator = new Border { Width = 1, Height = 16, VerticalAlignment = VerticalAlignment.Center,
+                Background = new SolidColorBrush(Color.FromRgb(229, 231, 235)), IsHitTestVisible = false };
+            Grid.SetColumn(separator, 1); selectionBar.Children.Add(separator);
+            Grid.SetColumn(selectionAction, 2); selectionBar.Children.Add(selectionAction);
+            selectionButton.Content = new Border { Background = Brushes.White, CornerRadius = new CornerRadius(9),
+                Margin = new Thickness(6), Effect = Shadow(10, 0.14), Child = selectionBar };
             selectionCopy.Click += delegate {
                 if (offeredText == null) return;
                 try { setClipboardText(offeredText); DismissOffer(); }

@@ -140,8 +140,16 @@ namespace SelectionTranslator
                     string original = "  Original text\r\n第二行  ";
                     window.Close();
                     OfferForTest(window, original);
-                    var bar = (System.Windows.Controls.Primitives.UniformGrid)offer.Content;
-                    Check(bar.Children.Count == 2 && bar.Children[0] == sourceCopy && bar.Children[1] == translate, "floating toolbar orders original-copy left and translate right");
+                    var shell = (Border)offer.Content;
+                    var bar = (Grid)shell.Child;
+                    Check(bar.Children.Count == 3 && bar.Children[0] == sourceCopy && bar.Children[2] == translate, "floating toolbar orders copy, separator, translate");
+                    Check(shell.Background == Brushes.White && shell.CornerRadius == new CornerRadius(9) && shell.Effect != null, "single white rounded toolbar with shared shadow");
+                    var separator = (Border)bar.Children[1];
+                    Check(separator.Width == 1 && separator.Height == 16 && !separator.IsHitTestVisible, "short thin center separator");
+                    sourceCopy.ApplyTemplate(); translate.ApplyTemplate();
+                    Check(((Border)sourceCopy.Template.FindName("surface", sourceCopy)).CornerRadius == new CornerRadius(9, 0, 0, 9), "copy only rounds outside left corners");
+                    Check(((Border)translate.Template.FindName("surface", translate)).CornerRadius == new CornerRadius(0, 9, 9, 0), "translate only rounds outside right corners");
+                    Check(sourceCopy.Margin == new Thickness(0) && translate.Margin == new Thickness(0) && sourceCopy.Effect == null && translate.Effect == null, "no gap or separate button shadows");
                     Check(sourceCopy.TranslatePoint(new Point(), offer).X < translate.TranslatePoint(new Point(), offer).X, "copy button is physically left of translation button");
                     SavePreview(offer, "selection-translator-button.png");
                     sourceCopy.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
@@ -379,7 +387,7 @@ namespace SelectionTranslator
                     Check(result.BorderThickness == new Thickness(0) && ((Button)Field(window, "copy")).IsEnabled, "borderless result with enabled copy action");
                     var action = (Button)Field(window, "selectionAction");
                     action.ApplyTemplate();
-                    Check(((Border)action.Template.FindName("surface", action)).CornerRadius.TopLeft == 9, "translation button has rounded corners");
+                    Check(((Border)action.Template.FindName("surface", action)).CornerRadius == new CornerRadius(0, 9, 9, 0), "translation button has square inner corners");
                     Check(window.Height < 200, "short translation uses compact card instead of empty large frame");
                     var firstLine = result.GetRectFromCharacterIndex(0);
                     Check(firstLine.Height > 0 && firstLine.Bottom <= result.ActualHeight, "compact result does not clip the first line");
