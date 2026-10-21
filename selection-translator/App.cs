@@ -338,7 +338,7 @@ namespace SelectionTranslator
                     if (text.Length > CopilotClient.MaxTextLength) break;
                 }
                 // A collapsed caret is not a selection; keep trying its document ancestors.
-                if (!String.IsNullOrWhiteSpace(text.ToString())) return text.ToString().Trim();
+                if (!String.IsNullOrWhiteSpace(text.ToString())) return text.ToString();
             }
             return "";
         }
@@ -347,15 +347,17 @@ namespace SelectionTranslator
     public sealed class Desktop : Window
     {
         readonly CopilotClient client;
+        readonly Action<string> setClipboardText;
         readonly TextBox translated = new TextBox { IsReadOnly = true, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto, BorderThickness = new Thickness(0), Background = Brushes.White,
             Foreground = new SolidColorBrush(Color.FromRgb(38, 41, 46)), FontSize = 17, Padding = new Thickness(0), IsReadOnlyCaretVisible = false };
         readonly TextBlock status = new TextBlock { TextWrapping = TextWrapping.Wrap, Foreground = Brushes.Gray, FontSize = 12, Margin = new Thickness(0, 12, 0, 0) };
         readonly Button copy = new Button { Content = "复制", IsEnabled = false, ToolTip = "复制译文" };
-        readonly Window selectionButton = new Window { Title = "翻译选中文字", Width = 92, Height = 48, WindowStyle = WindowStyle.None,
+        readonly Window selectionButton = new Window { Title = "复制或翻译选中文字", Width = 160, Height = 48, WindowStyle = WindowStyle.None,
             AllowsTransparency = true, Background = Brushes.Transparent, ResizeMode = ResizeMode.NoResize, Topmost = true,
             ShowActivated = false, ShowInTaskbar = false, Focusable = false };
-        readonly Button selectionAction = new Button { Content = "翻译", Focusable = false, FontSize = 14, Margin = new Thickness(6) };
+        readonly Button selectionCopy = new Button { Content = "复制", ToolTip = "复制原文", Focusable = false, FontSize = 14, Margin = new Thickness(1, 0, 1, 0) };
+        readonly Button selectionAction = new Button { Content = "翻译", ToolTip = "流式翻译", Focusable = false, FontSize = 14, Margin = new Thickness(1, 0, 1, 0) };
         readonly System.Windows.Forms.NotifyIcon tray = new System.Windows.Forms.NotifyIcon();
         readonly System.Windows.Forms.ContextMenuStrip trayMenu = new System.Windows.Forms.ContextMenuStrip();
         readonly System.Windows.Forms.ToolStripMenuItem pauseMenu = new System.Windows.Forms.ToolStripMenuItem("暂停划词") { CheckOnClick = true };
@@ -404,9 +406,10 @@ namespace SelectionTranslator
         }
 
         internal Desktop(string authPath, string model) : this(new CopilotClient(authPath, model), model) { }
-        internal Desktop(CopilotClient client, string model)
+        internal Desktop(CopilotClient client, string model, Action<string> clipboardWriter = null)
         {
             this.client = client;
+            this.setClipboardText = clipboardWriter ?? new Action<string>(Clipboard.SetText);
             Title = "划词翻译 · Copilot Luna";
             Width = 460; Height = 180;
             WindowStyle = WindowStyle.None; ResizeMode = ResizeMode.NoResize;
@@ -417,8 +420,8 @@ namespace SelectionTranslator
             TextOptions.SetTextFormattingMode(this, TextFormattingMode.Display);
             var style = RoundedButtonStyle();
             copy.Style = style;
-            selectionAction.Style = style;
-            selectionAction.Effect = Shadow(10, 0.14);
+            selectionCopy.Style = style; selectionCopy.Effect = Shadow(10, 0.14);
+            selectionAction.Style = style; selectionAction.Effect = Shadow(10, 0.14);
             var card = new Border { Background = Brushes.White, CornerRadius = new CornerRadius(16), Margin = new Thickness(12),
                 Padding = new Thickness(22, 15, 22, 22), Effect = Shadow(22, 0.13) };
             Content = card;
@@ -448,14 +451,22 @@ namespace SelectionTranslator
             copy.Click += async delegate {
                 try {
                     if (!String.IsNullOrEmpty(translated.Text)) {
-                        Clipboard.SetText(translated.Text); status.Text = "已复制";
+                        setClipboardText(translated.Text); status.Text = "已复制";
                         await Task.Delay(1200);
                         if (!closed && status.Text == "已复制") status.Text = "";
                     }
                 }
                 catch (ExternalException) { status.Text = "剪贴板正被占用，请稍后重试。"; }
             };
-            selectionButton.Content = selectionAction;
+            var selectionBar = new System.Windows.Controls.Primitives.UniformGrid { Columns = 2, Margin = new Thickness(6) };
+            selectionBar.Children.Add(selectionCopy);
+            selectionBar.Children.Add(selectionAction);
+            selectionButton.Content = selectionBar;
+            selectionCopy.Click += delegate {
+                if (offeredText == null) return;
+                try { setClipboardText(offeredText); DismissOffer(); }
+                catch (ExternalException) { selectionCopy.ToolTip = "剪贴板正被占用，请再次点击重试。"; }
+            };
             selectionButton.SourceInitialized += delegate {
                 buttonHwnd = new WindowInteropHelper(selectionButton).Handle;
                 Native.NoActivate(buttonHwnd);
@@ -633,7 +644,9 @@ namespace SelectionTranslator
                 string text = await Task.Run(() => Native.ReadSelection(foreground, point));
                 if (closed || version != captureVersion || Native.GetForegroundWindow() != foreground || (auto && !detectionEnabled)) return;
                 if (String.IsNullOrWhiteSpace(text)) { DismissOffer(); return; }
-                text = CopilotClient.ValidateText(text);
+                if (text.Length > CopilotClient.MaxTextLength) throw new ArgumentException("选区最多 8000 个字符，较长原文请在原应用中复制。");
+                CopilotClient.ValidateText(text);
+                selectionCopy.ToolTip = "复制原文";
                 DismissOffer(); version = captureVersion;
                 offeredText = text; offeredPoint = point; offeredWindow = foreground;
                 offeredBounds = Native.PositionNear(selectionButton, point);

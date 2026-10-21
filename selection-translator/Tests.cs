@@ -106,13 +106,25 @@ namespace SelectionTranslator
             for (int i = 0; i < 200 && result.Text != prefix; i++) await Task.Delay(10);
             Check(result.Text == prefix, "UI receives streamed prefix before gated remainder");
         }
+        static void OfferForTest(Desktop window, string text)
+        {
+            typeof(Desktop).GetField("offeredText", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).SetValue(window, text);
+            var offer = (Window)Field(window, "selectionButton");
+            Native.PositionNear(offer, new Point(100, 100));
+            offer.UpdateLayout();
+        }
         static void StreamUiTests()
         {
             string path = Path.GetTempFileName();
             File.WriteAllText(path, "{\"github-copilot\":{\"access\":\"cached;proxy-ep=business.example\",\"expires\":4102444800000}}");
             var handler = new Handler { Remainder = new TaskCompletionSource<bool>() };
             var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
-            var window = new Desktop(new CopilotClient(path, "gpt-5.6-luna", handler), "gpt-5.6-luna");
+            string copiedText = null;
+            bool clipboardBusy = true;
+            var window = new Desktop(new CopilotClient(path, "gpt-5.6-luna", handler), "gpt-5.6-luna", text => {
+                if (clipboardBusy) throw new ExternalException("Test clipboard is busy");
+                copiedText = text;
+            });
             Exception failure = null;
             var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
             timer.Tick += async delegate {
@@ -122,6 +134,32 @@ namespace SelectionTranslator
                     var status = (TextBlock)Field(window, "status");
                     var copy = (Button)Field(window, "copy");
                     var pause = (System.Windows.Forms.ToolStripMenuItem)Field(window, "pauseMenu");
+                    var offer = (Window)Field(window, "selectionButton");
+                    var sourceCopy = (Button)Field(window, "selectionCopy");
+                    var translate = (Button)Field(window, "selectionAction");
+                    string original = "  Original text\r\n第二行  ";
+                    window.Close();
+                    OfferForTest(window, original);
+                    var bar = (System.Windows.Controls.Primitives.UniformGrid)offer.Content;
+                    Check(bar.Children.Count == 2 && bar.Children[0] == sourceCopy && bar.Children[1] == translate, "floating toolbar orders original-copy left and translate right");
+                    Check(sourceCopy.TranslatePoint(new Point(), offer).X < translate.TranslatePoint(new Point(), offer).X, "copy button is physically left of translation button");
+                    SavePreview(offer, "selection-translator-button.png");
+                    sourceCopy.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    Check(copiedText == null && offer.IsVisible && (string)Field(window, "offeredText") == original, "busy clipboard preserves source and keeps copy retry available");
+                    clipboardBusy = false;
+                    sourceCopy.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    Check(copiedText == original, "left copy preserves original whitespace and line breaks");
+                    Check(!offer.IsVisible && !window.IsVisible && handler.Translations == 0 && handler.Exchanges == 0, "copy original dismisses toolbar without opening result or contacting Copilot");
+                    OfferForTest(window, "hello");
+                    translate.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    await AwaitPrefix(result, "你");
+                    Check(!offer.IsVisible && handler.Translations == 1 && copiedText == original, "right button starts streamed translation without copying source");
+                    handler.Remainder.TrySetResult(true);
+                    for (int i = 0; i < 200 && Field(window, "pending") != null; i++) await Task.Delay(10);
+                    Check(result.Text == "你好" && Field(window, "pending") == null, "right button completes existing streaming translation");
+                    copy.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    Check(copiedText == "你好", "result copy still copies translation rather than original");
+                    handler.Remainder = new TaskCompletionSource<bool>();
                     var task = BeginTranslation(window);
                     await AwaitPrefix(result, "你");
                     Check(!task.IsCompleted && copy.IsEnabled && status.Text.Contains("正在翻译"), "UI readable/copyable before response completes");
@@ -243,10 +281,10 @@ namespace SelectionTranslator
             mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero);
             await Task.Delay(60);
         }
-        static async Task ClickWindow(Window window)
+        static async Task ClickAction(Button button)
         {
-            var bounds = WindowBounds(window);
-            await ClickAt((int)(bounds.Left + bounds.Width / 2), (int)(bounds.Top + bounds.Height / 2));
+            Point center = button.PointToScreen(new Point(button.ActualWidth / 2, button.ActualHeight / 2));
+            await ClickAt((int)center.X, (int)center.Y);
         }
         static void SavePreview(Window window, string name)
         {
@@ -313,7 +351,7 @@ namespace SelectionTranslator
                     await Task.Delay(600);
                     Check(handler.Translations == 0 && handler.Exchanges == 0, "selection alone never calls Copilot");
                     Check(result.Text == "" && !window.IsVisible, "selection does not reveal hidden translation frame");
-                    await ClickWindow(offer);
+                    await ClickAction((Button)Field(window, "selectionAction"));
                     for (int i = 0; i < 100 && !status.Text.Contains("HTTP 401"); i++) await Task.Delay(100);
                     Check(status.Text.Contains("HTTP 401") && result.Text == "", "explicit click reports API failure");
                     Check(handler.Translations == 1 && !offer.IsVisible, "one click sends one request and dismisses button");
@@ -326,7 +364,7 @@ namespace SelectionTranslator
                     await ClickAt(x, y);
                     for (int i = 0; i < 100 && !offer.IsVisible; i++) await Task.Delay(100);
                     Check(offer.IsVisible && handler.Translations == 1, "reselecting only offers button without retrying network");
-                    await ClickWindow(offer);
+                    await ClickAction((Button)Field(window, "selectionAction"));
                     for (int i = 0; i < 100 && result.Text != "你"; i++) await Task.Delay(100);
                     Check(result.Text == "你" && Field(window, "pending") != null, "first delta readable while response is still blocked");
                     Check(((Button)Field(window, "copy")).IsEnabled && status.Text.Contains("正在翻译"), "partial translation can be copied and is marked in progress");
