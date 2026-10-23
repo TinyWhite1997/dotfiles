@@ -2,8 +2,6 @@
 param(
     [ValidateSet('personal', 'work')][string]$Profile = 'personal',
     [switch]$AgentsOnly,
-    [string]$TunnelId,
-    [string]$McpUrl,
     [string[]]$DotbotArgs = @()
 )
 $ErrorActionPreference = 'Stop'
@@ -67,15 +65,14 @@ try {
         throw 'Node.js 22+ is required; upgrade Node and retry.'
     }
 
-    # The shared JSON/TOML config writer is also needed for Personal cleanup.
+    # Keep the config writer to remove our existing MCP registrations safely.
     & npm.cmd ci --prefix "$PSScriptRoot/scripts"
     if ($LASTEXITCODE -ne 0) { throw 'Agent configuration dependency installation failed.' }
 
     $Configure = Join-Path $PSScriptRoot 'scripts/configure-agents.mjs'
-    $ProfileArgs = @('--profile', $Profile)
-    if ($TunnelId) { $ProfileArgs += @('--tunnel-id', $TunnelId) }
-    if ($McpUrl) { $ProfileArgs += @('--url', $McpUrl) }
-    & node $Configure @ProfileArgs --check
+    # Hindsight is paused for both guidance profiles; reuse the existing Personal cleanup path.
+    $CleanupArgs = @('--profile', 'personal')
+    & node $Configure @CleanupArgs --check
     if ($LASTEXITCODE -ne 0) { throw 'Profile preflight failed; agent configuration was not changed.' }
 
     if (-not $AgentsOnly) {
@@ -112,24 +109,10 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'Dotbot installation failed.' }
     }
 
-    if ($Profile -eq 'work') {
-        if (-not (Get-Command devtunnel -ErrorAction SilentlyContinue)) {
-            Install-WingetPackage 'Microsoft.devtunnel'
-            Refresh-Path
-        }
-        # npm.ps1 re-evaluates the invocation and can lose caller variables; use the native shim.
-        & npm.cmd ci --prefix "$PSScriptRoot/hindsight"
-        if ($LASTEXITCODE -ne 0) { throw 'Hindsight MCP dependency installation failed.' }
-    }
     & $Python "$PSScriptRoot/dotbot/bin/dotbot" -d $PSScriptRoot -c "$PSScriptRoot/install.conf-agents.yaml" @DotbotArgs
     if ($LASTEXITCODE -ne 0) { throw 'Agent guidance symlinks failed. Enable Windows Developer Mode or run with symlink privileges.' }
-    & node $Configure @ProfileArgs
+    & node $Configure @CleanupArgs
     if ($LASTEXITCODE -ne 0) { throw 'Agent profile configuration failed.' }
-    if ($Profile -eq 'work') {
-        # The host/database already exists. Verify the private tunnel without writing memories.
-        & node "$PSScriptRoot/hindsight/smoke.mjs"
-        if ($LASTEXITCODE -ne 0) { throw 'MCP configured but not connected. Check the host, run devtunnel user login as the tunnel owner, then rerun.' }
-    }
     Write-Host "Installed $Profile profile. Restart Claude Code, Codex and Copilot; /reload Pi."
 } finally {
     $env:DOTFILES_PROFILE = $PreviousProfile

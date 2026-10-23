@@ -6,7 +6,7 @@ Agent → stdio.mjs → HTTPS + tunnel connect token → private Dev Tunnel → 
 
 No Agency, client-side forwarding port, anonymous tunnel access, or manually copied token. Node's MCP SDK handles Streamable HTTP/SSE; `devtunnel token` only issues credentials, never opens a forwarding connection.
 
-For work/personal Windows installation and automatic registration in Pi, Copilot, Claude Code and Codex, use [the profile installers](../INSTALL.md). The shared Work endpoint is defined in `client.work.json`; `~/.hindsight/client.json` is an optional machine-local override. No credentials are stored in the shared default.
+Hindsight is temporarily disabled in [the Windows profile installers](../INSTALL.md): both remove this adapter's MCP registrations instead of installing or checking it. The manual setup below is retained for later use; it is not run by normal installation. The shared endpoint remains in `client.work.json`, without credentials.
 
 ## Host configuration
 
@@ -48,7 +48,7 @@ Register this **stdio** MCP entry with your agent (use an absolute path):
 }
 ```
 
-For Copilot CLI, the equivalent is `copilot mcp add hindsight --timeout 180000 -- node <repo>/hindsight/stdio.mjs`. On Windows, `install.work.ps1 -AgentsOnly` registers all four clients while preserving other servers.
+For manual Copilot CLI setup, the equivalent is `copilot mcp add hindsight --timeout 180000 -- node <repo>/hindsight/stdio.mjs`. While Hindsight is paused, `install.work.ps1 -AgentsOnly` removes this adapter's registrations rather than adding them.
 
 An optional second argument explicitly selects another client config file (a missing explicit file is an error). With no argument, local overrides take precedence over the live repository default. If the Hindsight server also uses application API-key authentication, supply `HINDSIGHT_API_KEY` through your client's private environment/secret storage, not Git.
 

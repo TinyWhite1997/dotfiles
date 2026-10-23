@@ -28,12 +28,11 @@ The installer runs `npm install` in Pi's extension directory for extension runti
 
 Windows has two explicit [profile installers](../INSTALL.md). Dotbot symlinks
 `instructions/work.md` or `instructions/personal.md` as user guidance for
-Pi and Copilot; source edits need no reinstall, only a client reload. Work also registers the private Hindsight stdio MCP in Pi,
-Copilot, Claude Code and Codex; Personal removes only this adapter's MCP entry.
-Both profiles also remove this adapter's legacy Cursor registration.
-`~/.pi/agent/mcp.json` and the optional `~/.hindsight/client.json` override remain
-machine-local, never linked from Git. New work machines read the shared
-`hindsight/client.work.json` default without entering a tunnel ID or URL. Use `-AgentsOnly` to switch without reinstalling
+Pi and Copilot; source edits need no reinstall, only a client reload.
+Hindsight is temporarily disabled: neither profile installs its runtime or checks the tunnel.
+Both remove only this adapter's MCP registrations from Pi, Copilot, Claude Code,
+Codex and legacy Cursor settings, preserving unrelated servers, credentials and memory data.
+The adapter code remains in `hindsight/` for later use. Use `-AgentsOnly` to switch without reinstalling
 common dotfiles. Other platforms default to personal guidance;
 `DOTFILES_PROFILE=work ./install` selects work guidance without registering MCPs.
 

@@ -19,15 +19,16 @@ function Get-ChildItem { Record 'junction-scan' @() }
 function node {
     Record 'node' $args
     if ($args[0] -eq '--version') { 'v24.0.0'; return }
+    if ($args[0] -like '*smoke.mjs') { throw 'Paused Hindsight must not run a network smoke check.' }
     if (($global:InstallerTestFail -eq 'preflight' -and $args -contains '--check') -or
-        ($global:InstallerTestFail -eq 'smoke' -and $args[0] -like '*smoke.mjs')) { $global:LASTEXITCODE = 1 }
+        ($global:InstallerTestFail -eq 'config' -and $args -notcontains '--check')) { $global:LASTEXITCODE = 1 }
 }
 function npm.cmd {
     Record 'npm' $args
-    if (($global:InstallerTestFail -eq 'npm' -and $args[2] -like '*/hindsight') -or
-        ($global:InstallerTestFail -eq 'config-deps' -and $args[2] -like '*/scripts')) { $global:LASTEXITCODE = 1 }
+    if ($args[2] -like '*/hindsight') { throw 'Paused Hindsight must not install runtime dependencies.' }
+    if ($global:InstallerTestFail -eq 'config-deps' -and $args[2] -like '*/scripts') { $global:LASTEXITCODE = 1 }
 }
-function devtunnel { Record 'devtunnel' $args }
+function devtunnel { throw 'Paused Hindsight must not invoke devtunnel.' }
 function winget { Record 'winget' $args; if ($args[0] -eq 'list') { $args[2] } }
 function fzf { Record 'fzf' $args; '0.74.4' }
 function git { Record 'git' $args; if ($global:InstallerTestFail -eq 'git') { $global:LASTEXITCODE = 1 } }
@@ -50,16 +51,15 @@ Assert (($global:InstallerTestCalls[2].Arguments -contains 'personal') -and ($gl
 Assert ((Get-Location).Path -eq $Original) 'Working directory was not restored.'
 
 Reset
-& "$Repo/install.work.ps1" -AgentsOnly -TunnelId 'test.asse' -McpUrl 'https://test-8888.asse.devtunnels.ms/mcp/shared/'
+& "$Repo/install.work.ps1" -AgentsOnly
 $Npm = @($global:InstallerTestCalls | Where-Object Name -eq npm)
-Assert ($Npm.Count -eq 2) 'Work must install config and MCP dependencies.'
-Assert ($Npm[0].Arguments[2] -eq "$Repo/scripts" -and $Npm[1].Arguments[2] -eq "$Repo/hindsight") 'npm must receive absolute prefixes in prerequisite order.'
+Assert ($Npm.Count -eq 1 -and $Npm[0].Arguments[2] -eq "$Repo/scripts") 'Work must install only cleanup writer dependencies.'
 $Config = @($global:InstallerTestCalls | Where-Object { $_.Name -eq 'node' -and $_.Arguments[0] -like '*configure-agents.mjs' })
-Assert ($Config.Count -eq 2 -and $Config[0].Arguments -contains '--check') 'Work must preflight before configuring.'
-Assert ($Config[1].Arguments -contains 'test.asse') 'Work wrapper lost TunnelId.'
+Assert ($Config.Count -eq 2 -and $Config[0].Arguments -contains '--check') 'Work must preflight before cleanup.'
+foreach ($Call in $Config) { Assert ($Call.Arguments -contains 'personal') 'Paused Work must use the managed MCP cleanup path.' }
 $Guidance = @($global:InstallerTestCalls | Where-Object { $_.Name -eq 'python' -and $_.Arguments -contains "$Repo/install.conf-agents.yaml" })
-Assert ($Guidance.Count -eq 1 -and $Guidance[0].Profile -eq 'work') 'Work must pass its profile to Dotbot guidance.'
-Assert ($global:InstallerTestCalls[-1].Arguments[0] -like '*smoke.mjs') 'Work must run a real MCP smoke check.'
+Assert ($Guidance.Count -eq 1 -and $Guidance[0].Profile -eq 'work') 'Work must still pass its profile to Dotbot guidance.'
+Assert ($global:InstallerTestCalls[-1].Arguments[0] -like '*configure-agents.mjs') 'Work must finish after cleanup, without a remote smoke check.'
 
 Reset
 & "$Repo/install.personal.ps1" -DotbotArgs @('--only', 'link')
@@ -70,10 +70,12 @@ $Npm = @($global:InstallerTestCalls | Where-Object Name -eq npm)
 Assert ($Npm.Count -eq 1 -and $Npm[0].Arguments[2] -eq "$Repo/scripts") 'Personal must install only config dependencies, not Hindsight dependencies.'
 
 Reset
-& "$Repo/install.work.ps1" -AgentsOnly
+& "$Repo/install.work.ps1"
 $Config = @($global:InstallerTestCalls | Where-Object { $_.Name -eq 'node' -and $_.Arguments[0] -like '*configure-agents.mjs' })
-Assert ($Config.Count -eq 2 -and $Config[1].Arguments -notcontains '--tunnel-id') 'Default Work install must need no connection arguments.'
-Assert ($global:InstallerTestCalls[-1].Arguments[0] -like '*smoke.mjs') 'Default Work install must still verify connectivity.'
+Assert ($Config.Count -eq 2 -and $Config[1].Arguments -contains 'personal') 'Full Work installation must also clean up managed Hindsight registrations.'
+Assert (@($global:InstallerTestCalls | Where-Object Name -eq winget).Count -ge 16) 'Full Work must retain shared package installation.'
+Assert (@($global:InstallerTestCalls | Where-Object { $_.Name -eq 'winget' -and $_.Arguments -contains 'Microsoft.devtunnel' }).Count -eq 0) 'Paused Work must not install Dev Tunnels.'
+Assert ($global:InstallerTestCalls[-1].Arguments[0] -like '*configure-agents.mjs') 'Full Work must finish without a remote smoke check.'
 
 foreach ($DryRun in @('--dry-run', '-n')) {
     Reset
@@ -81,7 +83,7 @@ foreach ($DryRun in @('--dry-run', '-n')) {
     Assert (@($global:InstallerTestCalls | Where-Object Name -eq 'junction-scan').Count -eq 0) 'Dotbot dry-run must not migrate junctions.'
 }
 
-foreach ($Failure in @('config-deps', 'preflight', 'npm', 'git', 'dotbot', 'smoke')) {
+foreach ($Failure in @('config-deps', 'preflight', 'git', 'dotbot', 'config')) {
     Reset
     $global:InstallerTestFail = $Failure
     $Threw = $false
@@ -89,7 +91,7 @@ foreach ($Failure in @('config-deps', 'preflight', 'npm', 'git', 'dotbot', 'smok
     Assert $Threw "Failure '$Failure' was ignored."
     Assert ((Get-Location).Path -eq $Original) 'Failed installation did not restore working directory.'
     Assert ($env:DOTFILES_PROFILE -eq 'test-previous-value') 'Failed installation did not restore profile environment.'
-    if ($Failure -ne 'smoke') {
+    if ($Failure -ne 'config') {
         Assert (@($global:InstallerTestCalls | Where-Object { $_.Name -eq 'node' -and $_.Arguments[0] -like '*configure-agents.mjs' -and $_.Arguments -notcontains '--check' }).Count -eq 0) 'Configuration applied after failed prerequisite.'
     }
 }
