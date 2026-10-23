@@ -8,6 +8,14 @@ function Record([string]$Name, [object[]]$Arguments) {
     $global:LASTEXITCODE = 0
 }
 function Read-Host { throw 'Install must not prompt for Hindsight connection values.' }
+function Get-Command {
+    param([string[]]$Name, [switch]$All, [string]$CommandType, [string]$ErrorAction)
+    if ($Name -contains 'python') { [pscustomobject]@{ Source = 'python' }; return }
+    Microsoft.PowerShell.Core\Get-Command @PSBoundParameters
+}
+# Real filesystem migration is covered by install-windows.test.ps1.
+function Get-ChildItem { Record 'junction-scan' @() }
+
 function node {
     Record 'node' $args
     if ($args[0] -eq '--version') { 'v24.0.0'; return }
@@ -23,7 +31,7 @@ function devtunnel { Record 'devtunnel' $args }
 function winget { Record 'winget' $args; if ($args[0] -eq 'list') { $args[2] } }
 function fzf { Record 'fzf' $args; '0.74.4' }
 function git { Record 'git' $args; if ($global:InstallerTestFail -eq 'git') { $global:LASTEXITCODE = 1 } }
-function python { Record 'python' $args; if ($args[0] -eq '-V') { 'Python 3.13.0' } elseif ($global:InstallerTestFail -eq 'dotbot') { $global:LASTEXITCODE = 1 } }
+function python { Record 'python' $args; if ($args[0] -eq '-V') { 'Python 3.13.0' } elseif ($global:InstallerTestFail -eq 'dotbot' -and $args[0] -like '*dotbot/bin/dotbot') { $global:LASTEXITCODE = 1 } }
 function Assert([bool]$Condition, [string]$Message) { if (-not $Condition) { throw $Message } }
 function Reset {
     $global:InstallerTestCalls.Clear()
@@ -66,6 +74,12 @@ Reset
 $Config = @($global:InstallerTestCalls | Where-Object { $_.Name -eq 'node' -and $_.Arguments[0] -like '*configure-agents.mjs' })
 Assert ($Config.Count -eq 2 -and $Config[1].Arguments -notcontains '--tunnel-id') 'Default Work install must need no connection arguments.'
 Assert ($global:InstallerTestCalls[-1].Arguments[0] -like '*smoke.mjs') 'Default Work install must still verify connectivity.'
+
+foreach ($DryRun in @('--dry-run', '-n')) {
+    Reset
+    & "$Repo/install.personal.ps1" -DotbotArgs @($DryRun)
+    Assert (@($global:InstallerTestCalls | Where-Object Name -eq 'junction-scan').Count -eq 0) 'Dotbot dry-run must not migrate junctions.'
+}
 
 foreach ($Failure in @('config-deps', 'preflight', 'npm', 'git', 'dotbot', 'smoke')) {
     Reset

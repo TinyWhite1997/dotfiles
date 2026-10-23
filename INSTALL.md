@@ -77,6 +77,7 @@ node --test scripts/configure-agents.test.mjs scripts/guidance.test.mjs
 $env:DOTFILES_TEST_CODEX = (Get-Command codex -CommandType Application).Source
 node --test scripts/configure-agents.test.mjs
 pwsh -NoProfile -File scripts/install.test.ps1
+pwsh -NoProfile -File scripts/install-windows.test.ps1
 npm test --prefix hindsight
 node hindsight/smoke.mjs
 pi mcp list

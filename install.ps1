@@ -31,14 +31,33 @@ function Get-DotbotPython {
 }
 
 function Refresh-Path {
-    $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' +
-        [Environment]::GetEnvironmentVariable('Path', 'User') + ';' + $env:Path
+    # CMD drops PATH when repeated refreshes grow it beyond its environment limit.
+    $Seen = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    $Paths = @([Environment]::GetEnvironmentVariable('Path', 'Machine'),
+        [Environment]::GetEnvironmentVariable('Path', 'User'), $env:Path) -join ';'
+    $env:Path = (($Paths -split ';') | Where-Object { $_ -and $Seen.Add($_.TrimEnd('\')) }) -join ';'
+}
+
+function Repair-AgentJunctions([string]$Repo, [string]$Python, [string]$AgentHome = "$HOME/.pi/agent") {
+    foreach ($Kind in @('skills', 'extensions')) {
+        foreach ($Source in (Get-ChildItem -LiteralPath "$Repo/pi/agent/$Kind" -Directory)) {
+            $Link = Get-Item -LiteralPath "$AgentHome/$Kind/$($Source.Name)" -Force -ErrorAction SilentlyContinue
+            if ($Link.LinkType -ne 'Junction' -or $Link.Target -ne $Source.FullName) { continue }
+            # Dotbot mistakes junctions for real directories; remove only our junction, never its target.
+            [IO.Directory]::Delete($Link.FullName)
+            & $Python -c "import os, sys; os.symlink(sys.argv[1], sys.argv[2], target_is_directory=True)" $Source.FullName $Link.FullName
+            if ($LASTEXITCODE -ne 0) { throw "Cannot replace legacy junction $($Link.FullName) with a symlink." }
+            Write-Host "Replaced legacy junction $($Link.FullName) with a symlink."
+
+        }
+    }
 }
 
 $PreviousProfile = $env:DOTFILES_PROFILE
 $env:DOTFILES_PROFILE = $Profile
 Push-Location $PSScriptRoot
 try {
+    Refresh-Path
     if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
         Install-WingetPackage 'OpenJS.NodeJS.LTS'
         Refresh-Path
@@ -86,6 +105,9 @@ try {
     & $Python -c "import os, sys, tempfile; d = tempfile.TemporaryDirectory(); os.symlink(sys.executable, os.path.join(d.name, 'link')); d.cleanup()"
     if ($LASTEXITCODE -ne 0) { throw 'Dotbot needs symlink privileges. Enable Windows Developer Mode or rerun this installer as administrator.' }
     if (-not $AgentsOnly) {
+        if ($DotbotArgs -notcontains '--dry-run' -and $DotbotArgs -notcontains '-n') {
+            Repair-AgentJunctions -Repo $PSScriptRoot -Python $Python
+        }
         & $Python "$PSScriptRoot/dotbot/bin/dotbot" -d $PSScriptRoot -c "$PSScriptRoot/install.conf-win.yaml" @DotbotArgs
         if ($LASTEXITCODE -ne 0) { throw 'Dotbot installation failed.' }
     }
