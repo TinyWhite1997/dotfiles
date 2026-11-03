@@ -70,7 +70,9 @@ impl Session {
         // ponytail: WTS reports a client name, not a verified OS/device identity.
         // Rename the client to include iPhone/iPad if its name does not identify it.
         let name = self.client.to_ascii_lowercase();
-        self.active && self.protocol == 2 && (name.contains("iphone") || name.contains("ipad"))
+        self.active
+            && self.protocol == 2
+            && (name.contains("iphone") || name.contains("ipad") || name == "ipa2693")
     }
 }
 
@@ -548,6 +550,7 @@ mod tests {
             (true, 2, "Weikai iPhone", true),
             (true, 2, "Weikai iPad", true),
             (true, 2, "WEIKAI IPAD PRO", true),
+            (true, 2, "iPA2693", true),
             (true, 2, "WEIKAI127", false),
             (true, 2, "", false),
             (false, 2, "Weikai iPhone", false),

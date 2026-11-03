@@ -1,4 +1,4 @@
-# Native, interactive smoke test. Run in an iPhone/iPad RDP session with no existing instance.
+# Native, interactive smoke test. Run in a supported mobile RDP session with no existing instance.
 # Injected shortcut keys are intercepted so this test does NOT start voice recording.
 param(
     [string]$Exe = "$PSScriptRoot/target/release/rdp-voice-button.exe",
@@ -143,7 +143,7 @@ public static class VoiceButtonSmoke {
                 Pump(1700);
                 Check(!IsWindowVisible(button), "expected hidden in a disconnected/desktop/non-RDP session");
             } else {
-                Check(IsWindowVisible(button), "button not visible: requires an active iPhone/iPad RDP client");
+                Check(IsWindowVisible(button), "button not visible: requires an active supported mobile RDP client");
             }
             uint owner; GetWindowThreadProcessId(button, out owner);
             Check(owner == process.Id, "unexpected window owner");

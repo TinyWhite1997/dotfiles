@@ -2,7 +2,7 @@
 
 一个原生 Windows / Rust 小程序，只有 `windows-sys` 这一项直接依赖，不需要管理员权限。
 
-- 实时查询**当前用户会话**的 WTS 客户端信息：活动 RDP 连接且客户端名称包含 `iPhone` / `iPad`（忽略大小写）时才显示。例如 `Weikai iPhone`、`Weikai iPad`。
+- 实时查询**当前用户会话**的 WTS 客户端信息：活动 RDP 连接且客户端名称包含 `iPhone` / `iPad`（忽略大小写），或名称为当前 iQOO Pad Pro 报告的 `iPA2693` 时才显示。
 - 默认位于主屏幕工作区左下角，避开任务栏；64 DIP 的柔和翡翠绿渐变圆形按钮，带细高光边和静态柔影，中央是圆润的矢量麦克风图标；支持抗锯齿与 DPI 缩放，透明四角不会挡住点击。不使用实时背景模糊或动画。
 - 点击后发送一次 **右 Alt 按下 → Space 按下 → Space 松开 → 右 Alt 松开**。各步间隔为 30 / 50 / 30 毫秒，与现有 AHK `SendEvent` / `SetKeyDelay 30, 50` 的节奏一致，不把四个事件瞬间批量发送。窗口置顶，但不会激活或抢走当前输入框焦点。
 - 按住移动至少 8 DIP 就视为拖动；释放时不发送快捷键，即使又拖回起点。位置在本次进程内保留，重启后回到左下角。
@@ -36,7 +36,7 @@ Start-Process .\target\release\rdp-voice-button.exe
 
 ## 限制
 
-- WTS 的客户端名称不是经过验证的设备型号/操作系统。名称包含 `iPhone` / `iPad` 就会匹配；如果设备用了其他名字，需要在客户端/设备端调整名称。这不是安全或身份校验。
+- WTS 的客户端名称不是经过验证的设备型号/操作系统。名称包含 `iPhone` / `iPad` 或等于 `iPA2693` 就会匹配；其他设备名称需要另行加入允许名单。这不是安全或身份校验。
 - 不使用进程环境变量 `CLIENTNAME`，因为它在其他设备重连后可能仍是旧值。WTS 查询失败时隐藏按钮。
 - 点击时如果正在按着 Ctrl / Shift / Win / Alt / Space，会鸣提示音而不发送，避免组合成其他快捷键。
 - Windows 的 UIPI 可能阻止向“以管理员身份运行”的应用注入按键。请优先让目标应用以普通权限运行；注入失败会鸣提示音，不会提权。
@@ -51,7 +51,7 @@ cargo clippy --locked --all-targets -- -D warnings
 cargo test --locked live_session -- --ignored --nocapture
 # 导出 64/128 像素和按下状态的 PNG 外观预览（不需要连接或录音）：
 cargo test --locked write_previews -- --ignored --nocapture
-# 需要活动的 iPhone/iPad RDP 会话，并且没有已运行的按钮实例：
+# 需要活动的受支持移动设备 RDP 会话，并且没有已运行的按钮实例：
 pwsh -NoProfile -File .\smoke.ps1
 # 断开连接、桌面客户端或本地会话中，检查隐藏/单实例/退出（不移动鼠标）：
 pwsh -NoProfile -File .\smoke.ps1 -ExpectHidden
