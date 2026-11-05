@@ -1,7 +1,5 @@
 param(
     [switch]$AgentsOnly,
-    [string]$TunnelId,
-    [string]$McpUrl,
     [string[]]$DotbotArgs = @()
 )
 $ErrorActionPreference = 'Stop'

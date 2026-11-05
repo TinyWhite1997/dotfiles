@@ -28,12 +28,11 @@ The installer runs `npm install` in Pi's extension directory for extension runti
 
 Windows has two explicit [profile installers](../INSTALL.md). Dotbot symlinks
 `instructions/work.md` or `instructions/personal.md` as user guidance for
-Pi and Copilot; source edits need no reinstall, only a client reload. Work also registers the private Hindsight stdio MCP in Pi,
-Copilot, Claude Code and Codex; Personal removes only this adapter's MCP entry.
-Both profiles also remove this adapter's legacy Cursor registration.
-`~/.pi/agent/mcp.json` and the optional `~/.hindsight/client.json` override remain
-machine-local, never linked from Git. New work machines read the shared
-`hindsight/client.work.json` default without entering a tunnel ID or URL. Use `-AgentsOnly` to switch without reinstalling
+Pi and Copilot; source edits need no reinstall, only a client reload.
+Hindsight is temporarily disabled: neither profile installs its runtime or checks the tunnel.
+Both remove only this adapter's MCP registrations from Pi, Copilot, Claude Code,
+Codex and legacy Cursor settings, preserving unrelated servers, credentials and memory data.
+The adapter code remains in `hindsight/` for later use. Use `-AgentsOnly` to switch without reinstalling
 common dotfiles. Other platforms default to personal guidance;
 `DOTFILES_PROFILE=work ./install` selects work guidance without registering MCPs.
 
@@ -199,13 +198,21 @@ pi
 ```
 
 At session startup, the extension checks `agency --version` with a five-second
-timeout. If the CLI is available on PATH and runs successfully, it connects to
-Agency's MCP Gateway automatically; no startup flag is needed. If the CLI is
-missing, fails the check, or times out, it silently skips MCP startup without
-registering Agency tools or injecting its system-prompt guidance. Gateway
-connection errors after a successful check are still reported.
+timeout and connects to Agency's MCP Gateway in the background, so neither step
+blocks the UI; no startup flag is needed. If the CLI is missing, fails the check,
+or times out, it silently skips MCP startup without registering Agency tools or
+injecting its system-prompt guidance. Gateway connection errors after a successful
+check are still reported. An immediate first prompt waits for background startup
+before reaching the model, so its Agency tools and guidance are not missed.
+Shutdown/reload cancels pending detection/connection and closes the Gateway.
+CLI detection uses a hidden, output-capturing process on Windows; Gateway stderr
+is also piped instead of inheriting the active terminal.
 
-Use `/agency-status` to inspect availability/connection state. After installing
+These changes remove Agency's handshake from the UI startup path, not the import
+cost of other extensions. When measuring interactive startup, use the installed
+`pi` command (its bundled entry), not the unbundled SDK CLI or RPC readiness.
+
+Use `/agency-status` to inspect detection, connection, and availability state. After installing
 Agency or changing PATH, restart Pi (or `/reload` if this process already has the
 updated PATH).
 

@@ -1,6 +1,11 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Force
 
+!h::Send "{Left}"
+!j::Send "{Down}"
+!k::Send "{Up}"
+!l::Send "{Right}"
+
 ; WeChat voice input: trigger once on release, using right Alt specifically.
 F8 Up::{
     SetKeyDelay 30, 50
