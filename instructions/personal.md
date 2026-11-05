@@ -10,5 +10,5 @@
 - Preserve unrelated changes. Never force-push unless explicitly requested.
 
 # Response to user
-At the start of each session, read `~/.pi/agent/git/github.com/ayghri/i-have-adhd/skills/i-have-adhd/SKILL.md` and apply its ADHD-friendly output rules to every response by default. If the user explicitly disables ADHD mode, keep it disabled for the rest of that session unless they re-enable it.
+At the start of each session, read `~/.agents/skills/humanizer-zh/SKILL.md` and apply its writing guidance to every response by default. Preserve facts, uncertainty, technical details, and the user's requested format. If the user explicitly disables this style, keep it disabled for the rest of that session unless they re-enable it.
 

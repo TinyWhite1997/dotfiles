@@ -13,5 +13,8 @@ Get-Content (Join-Path $root "agent/packages") | ForEach-Object {
     if ($LASTEXITCODE -ne 0) { throw "pi install $pkg failed" }
 }
 
+& npx --yes skills add op7418/Humanizer-zh --skill humanizer-zh --global --agent pi --agent github-copilot --yes
+if ($LASTEXITCODE -ne 0) { throw "humanizer-zh installation failed" }
+
 & node (Join-Path $root "sync-packages.cjs")
 if ($LASTEXITCODE -ne 0) { throw "Package sync failed" }

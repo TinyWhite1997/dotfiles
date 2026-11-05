@@ -15,4 +15,6 @@ while IFS= read -r pkg || [ -n "$pkg" ]; do
 	pi install "$pkg"
 done <"$root/agent/packages"
 
+npx --yes skills add op7418/Humanizer-zh --skill humanizer-zh --global --agent pi --agent github-copilot --yes
+
 node "$root/sync-packages.cjs"

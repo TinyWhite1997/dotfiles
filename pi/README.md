@@ -76,6 +76,22 @@ git commit                  # pre-commit copies settings.packages into agent/pac
 
 `./install` on another machine reads that file and runs `pi install` for each line. `pi` must already be on PATH.
 
+## Default response style
+
+Both guidance profiles use [humanizer-zh](https://github.com/op7418/Humanizer-zh)
+for natural wording while preserving facts, uncertainty, and technical details.
+The Pi package installers also install this skill with the Skills CLI:
+
+```bash
+npx --yes skills add op7418/Humanizer-zh --skill humanizer-zh --global --agent pi --agent github-copilot --yes
+```
+
+The skill lives at `~/.agents/skills/humanizer-zh/`, which Pi discovers directly;
+existing skill links from other agents use the same copy. This is a standalone
+skill, not a Pi extension package, so it is not listed in `agent/packages`.
+When switching profiles with `-AgentsOnly`, run the command above if the skill
+is not installed yet. Restart existing agent sessions after changing the default style.
+
 ## Goal-X
 
 The default package is `pi-goal-x@0.32.3`, pinned to the version checked with

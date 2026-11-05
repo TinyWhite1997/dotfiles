@@ -8,6 +8,18 @@ import { test } from 'node:test';
 
 const repo = fileURLToPath(new URL('../', import.meta.url));
 
+test('both profiles use humanizer-zh and both package installers install it globally', async () => {
+  for (const profile of ['personal', 'work']) {
+    const guidance = await readFile(join(repo, 'instructions', `${profile}.md`), 'utf8');
+    assert.ok(guidance.includes('read `~/.agents/skills/humanizer-zh/SKILL.md`'));
+    assert.ok(guidance.includes('apply its writing guidance to every response by default'));
+  }
+  const command = 'npx --yes skills add op7418/Humanizer-zh --skill humanizer-zh --global --agent pi --agent github-copilot --yes';
+  for (const file of ['pi/install-packages.sh', 'pi/install-packages.ps1']) {
+    assert.ok((await readFile(join(repo, file), 'utf8')).includes(command));
+  }
+});
+
 test('real Dotbot links selected guidance, preserves originals, and reflects source edits without reinstall', async t => {
   const root = await mkdtemp(join(tmpdir(), 'dotbot-guidance-'));
   t.after(() => rm(root, { recursive: true, force: true }));
