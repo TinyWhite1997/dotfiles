@@ -6,7 +6,7 @@ import { CopilotSearchProvider, piAuthPath, resolveAuth } from './search.js';
 export const name = 'web-search-copilot';
 export const inject = ['web'];
 export const Config = z.object({
-  model: z.string().default('gpt-5.4-nano'),
+  model: z.string().default('gpt-6-luna'),
   effort: z.union(['none', 'low', 'medium', 'high']).default('low'),
   timeoutMs: z.number().default(55_000),
   piAuthFile: z.string().default(piAuthPath()),

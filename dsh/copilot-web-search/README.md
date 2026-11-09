@@ -1,6 +1,6 @@
 # Copilot Web Search for DeepSeek Harness
 
-将 [pi 的 Copilot 搜索方案](../../pi/agent/extensions/copilot-web-search.ts) 接到 DSH 原生 `ctx.web` provider 接口，供任意聊天模型的 Agent 使用。搜索通过 Copilot `/responses` 的服务端 `web_search`，默认辅助模型为 `gpt-5.4-nano`，不使用聊天模型自身的联网能力。
+将 [pi 的 Copilot 搜索方案](../../pi/agent/extensions/copilot-web-search.ts) 接到 DSH 原生 `ctx.web` provider 接口，供任意聊天模型的 Agent 使用。搜索通过 Copilot `/responses` 的服务端 `web_search`，默认辅助模型为 `gpt-6-luna`，不使用聊天模型自身的联网能力。
 
 - 复用原生 `web_search`：查询参数为 `queries: ["完整的自然语言问题"]`，保留多查询、搜索卡片、引用、来源数量限制及取消机制。
 - 不注册同名工具，不替换聊天模型，不复制 DSH 的前端或工具代码。
@@ -57,7 +57,7 @@ dsh plugin --profile web add "file:$bundle"
 - id: web-search-copilot
   name: '@tinywhite/dsh-copilot-web-search'
   config:
-    model: gpt-5.4-nano
+    model: gpt-6-luna
     effort: low
     timeoutMs: 55000
     # piAuthFile: C:/Users/you/.pi/agent/auth.json

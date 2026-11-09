@@ -36,7 +36,7 @@ test('loads in real Cordis, pins search, respects caps and disposes with its fib
   };
   // Validate real schema defaults and the actual entrypoint, but avoid the real credential store.
   const config = plugin.Config({ piAuthFile: path.join(root, 'nonexistent-test-auth.json') });
-  assert.equal(config.model, 'gpt-5.4-nano');
+  assert.equal(config.model, 'gpt-6-luna');
   assert.equal(config.timeoutMs, 55_000);
   assert.equal(config.effort, 'low');
   plugin.apply(fake, config);

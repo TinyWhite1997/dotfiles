@@ -6,7 +6,7 @@
  * HTTP(S) URL，优先协商 Markdown，再用 Defuddle 提取正文，并按需聚焦/分页以节省 token。
  *
  * 环境变量：
- *   PI_COPILOT_SEARCH_MODEL   搜索使用的模型，默认 gpt-5-mini
+ *   PI_COPILOT_SEARCH_MODEL   搜索使用的模型，默认 gpt-6-luna
  *   PI_COPILOT_SEARCH_EFFORT  reasoning effort: none|low|medium|high，默认 low
  *   PI_CODING_AGENT_DIR       pi 配置目录，默认 ~/.pi/agent
  */
@@ -34,7 +34,7 @@ const AGENT_DIR =
   process.env.PI_CODING_AGENT_DIR || path.join(os.homedir(), ".pi", "agent");
 const AUTH_PATH = path.join(AGENT_DIR, "auth.json");
 
-const SEARCH_MODEL = process.env.PI_COPILOT_SEARCH_MODEL || "gpt-5-mini";
+const SEARCH_MODEL = process.env.PI_COPILOT_SEARCH_MODEL || "gpt-6-luna";
 const SEARCH_EFFORT = process.env.PI_COPILOT_SEARCH_EFFORT || "low";
 
 // ---------------------------------------------------------------- 凭据
