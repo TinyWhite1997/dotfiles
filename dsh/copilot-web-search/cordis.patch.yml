@@ -1,0 +1,9 @@
+# Keep DSH's native web_search tool and HTTP web_fetch provider.
+- insert:
+    - id: web-search-copilot
+      name: '@tinywhite/dsh-copilot-web-search'
+- id: web
+  name: '@deepseek-ai/dsh-web'
+  config:
+    searchProvider: github-copilot
+    fetchProvider: http

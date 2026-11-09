@@ -52,6 +52,10 @@ The cleanup writer requires Node.js 22+ and `npm ci --prefix scripts`. Invalid J
 
 Close clients while installing to avoid concurrent config writes. Restart Claude Code, Copilot and Codex, and `/reload` Pi afterward: an already-running session can still hold a previous MCP connection. No permissions or destructive-tool auto-approval settings are changed.
 
+## Optional DeepSeek Harness web search
+
+The [Copilot web search bundle](dsh/copilot-web-search/README.md) is stored in this repository and installed separately into a DSH profile. It reuses DSH or Pi Copilot credentials and the native `web_search` tool; `web_fetch` stays on DSH's HTTP provider. The common Dotbot installers do not change DSH profiles or credentials. See the bundle documentation for installation, compatibility, configuration and tests.
+
 ## Verification
 
 ```powershell
