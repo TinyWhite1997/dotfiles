@@ -26,6 +26,12 @@
       backup: true
       force: true
       create: true
+    ~/AppData/Roaming/herdr-core/config.toml:
+      path: config/herdr-core/config.toml
+      relink: true
+      backup: true
+      force: true
+      create: true
     ~/AppData/Roaming/alacritty/alacritty.toml:
       path: config/alacritty/alacritty.toml
       relink: true
