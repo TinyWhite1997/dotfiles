@@ -21,8 +21,9 @@ Run from PowerShell (7 recommended). The two public entrypoints share `install.p
 - `instructions/work.md`: work-machine guidance; Hindsight discovery, recall and retention are temporarily disabled.
 - `instructions/personal.md`: personal tasks; never use the work memory service.
 
-Dotbot links both Pi and Copilot directly to the selected source file, at their native user-level paths:
+Dotbot links DeepSeek Harness, Pi, and Copilot directly to the selected source file, at their native user-level paths:
 
+- `~/.dsh/AGENTS.md`
 - `~/.pi/agent/AGENTS.md`
 - `~/.copilot/copilot-instructions.md`
 
@@ -50,7 +51,7 @@ Unrelated servers and settings are preserved, including independently configured
 
 The cleanup writer requires Node.js 22+ and `npm ci --prefix scripts`. Invalid JSON/TOML and symlinked MCP configuration files fail preflight before guidance is changed. Existing files get a first-install `.dotfiles-backup`; treat these backups as private. TOML values are preserved, but comments/formatting can change. Updates are atomic per file, not a transaction across clients; rerunning converges safely after an I/O failure.
 
-Close clients while installing to avoid concurrent config writes. Restart Claude Code, Copilot and Codex, and `/reload` Pi afterward: an already-running session can still hold a previous MCP connection. No permissions or destructive-tool auto-approval settings are changed.
+Close clients while installing to avoid concurrent config writes. Restart DeepSeek Harness, Claude Code, Copilot and Codex, and `/reload` Pi afterward: an already-running session can still hold previous guidance or an MCP connection. No permissions or destructive-tool auto-approval settings are changed.
 
 ## Optional DeepSeek Harness web search
 

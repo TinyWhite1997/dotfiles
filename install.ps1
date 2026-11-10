@@ -113,7 +113,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Agent guidance symlinks failed. Enable Windows Developer Mode or run with symlink privileges.' }
     & node $Configure @CleanupArgs
     if ($LASTEXITCODE -ne 0) { throw 'Agent profile configuration failed.' }
-    Write-Host "Installed $Profile profile. Restart Claude Code, Codex and Copilot; /reload Pi."
+    Write-Host "Installed $Profile profile. Restart DeepSeek Harness, Claude Code, Codex and Copilot; /reload Pi."
 } finally {
     $env:DOTFILES_PROFILE = $PreviousProfile
     Pop-Location

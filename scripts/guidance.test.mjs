@@ -27,7 +27,7 @@ test('real Dotbot links selected guidance, preserves originals, and reflects sou
   const source = join(root, 'instructions');
   await mkdir(source);
   for (const profile of ['work', 'personal']) await writeFile(join(source, `${profile}.md`), `${profile} guide\n`);
-  const targets = [join(home, '.pi/agent/AGENTS.md'), join(home, '.copilot/copilot-instructions.md')];
+  const targets = [join(home, '.dsh/AGENTS.md'), join(home, '.pi/agent/AGENTS.md'), join(home, '.copilot/copilot-instructions.md')];
   for (const path of targets) {
     await mkdir(join(path, '..'), { recursive: true });
     await writeFile(path, 'original user instructions');

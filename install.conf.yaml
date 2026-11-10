@@ -46,6 +46,11 @@
       relink: true
       create: true
       backup: true
+    ~/.dsh/AGENTS.md:
+      path: instructions/${DOTFILES_PROFILE}.md
+      relink: true
+      create: true
+      backup: true
     ~/.pi/agent/AGENTS.md:
       path: instructions/${DOTFILES_PROFILE}.md
       relink: true
