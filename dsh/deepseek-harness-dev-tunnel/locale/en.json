@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Desktop Dev Tunnel",
+    "description": "Publishes the local Harness web port through the private deepseek-harness-desktop Dev Tunnel."
+  }
+}

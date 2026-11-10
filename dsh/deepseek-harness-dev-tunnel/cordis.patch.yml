@@ -1,0 +1,33 @@
+# Keep both the local listener and the Dev Tunnel URL stable.
+- id: webserver
+  config:
+    host: !!js ctx.webStartup.host ?? '127.0.0.1'
+    port: 63694
+    tls: !!js ctx.webStartup.tls
+    compression: gzip
+    compressionLevel: 1
+    compressionThresholdBytes: 1024
+
+# Makes the URL printed/opened by dsh web use the tunnel authority while
+# connection.authenticatedUrl adds the current process credential.
+- id: web-runtime
+  config:
+    openBrowser: !!js ctx.webStartup.openBrowser
+    printUrl: true
+    publicUrl: 'https://35mm2rds-63694.asse.devtunnels.ms/'
+    surfaceContext: true
+
+# The proxy preserves these browser authorities, so Connection must trust the
+# fixed external host for authenticated API and settings writes.
+- id: connection
+  config:
+    trustedHosts: !!js "['35mm2rds-63694.asse.devtunnels.ms', ...(ctx.webStartup.trustedHosts ?? [])]"
+
+# Persist the current preview notice acknowledgement on the Desktop Host.
+- id: ui-settings-general
+  config:
+    welcomeNoticeVersion: '2026-09-28.1'
+
+- insert:
+    - id: deepseek-harness-dev-tunnel
+      name: '@local/deepseek-harness-dev-tunnel'

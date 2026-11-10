@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Dev Tunnel">
+  <defs>
+    <linearGradient id="g" x1="8" y1="8" x2="56" y2="56" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6E56CF"/>
+      <stop offset="1" stop-color="#2F80ED"/>
+    </linearGradient>
+  </defs>
+  <path d="M13 44V30c0-11 8-20 19-20s19 9 19 20v14h-9V30c0-6-4-11-10-11s-10 5-10 11v14h-9Z" fill="url(#g)"/>
+  <path d="M7 39h21v15H7zM36 39h21v15H36z" rx="4" fill="#182230"/>
+  <path d="M17 43v7M47 43v7" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+</svg>

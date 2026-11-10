@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Desktop Dev Tunnel",
+    "description": "通过私有的 deepseek-harness-desktop Dev Tunnel 暴露本地 Harness Web 端口。"
+  }
+}
