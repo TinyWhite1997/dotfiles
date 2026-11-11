@@ -16,3 +16,6 @@ scripts/node_modules/
 /.pi/fabric/mesh/
 # Goal-X objectives, evidence, ledgers and archives are runtime state
 /.pi/goals/
+# Herdr writes editor metadata when checking or loading a mod.
+/herdr/app/mods/*/gpui-kit.d.ts
+/herdr/app/mods/*/jsconfig.json
