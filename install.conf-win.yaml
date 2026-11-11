@@ -62,6 +62,11 @@
       path: pi/agent/pi-goal-x-settings.json
       relink: true
       create: true
+    ~/.config/herdr-app/mods/pi-session-restore:
+      path: herdr-app/mods/pi-session-restore
+      relink: true
+      force: true
+      create: true
     ~/.pi/agent/skills/:
       glob: true
       path: pi/agent/skills/*
