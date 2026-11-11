@@ -23,4 +23,7 @@ for item in [
 }
 assert equal (which z | first | get type) 'alias'
 assert equal (which zi | first | get type) 'alias'
+let restore = (__herdr_pi_restore_target {labels: {"herdr.pi.session_path": 'C:/sessions/one.jsonl', "herdr.pi.session_cwd": 'C:/repo'}})
+assert equal $restore {path: 'C:/sessions/one.jsonl', cwd: 'C:/repo'}
+assert equal (__herdr_pi_restore_target {labels: {}}) null
 print 'startup: configuration, worktree root, listing aliases, and zoxide loaded successfully'

@@ -55,17 +55,17 @@
       relink: true
       force: true
       create: true
+    ~/AppData/Roaming/nushell/herdr-pi-restore.nu:
+      path: config/nushell/herdr-pi-restore.nu
+      relink: true
+      force: true
+      create: true
     ~/AppData/Roaming/Rime:
       path: Rime
       relink: true
     ~/.pi/agent/pi-goal-x-settings.json:
       path: pi/agent/pi-goal-x-settings.json
       relink: true
-      create: true
-    ~/.config/herdr-app/mods/pi-session-restore:
-      path: herdr-app/mods/pi-session-restore
-      relink: true
-      force: true
       create: true
     ~/.pi/agent/skills/:
       glob: true

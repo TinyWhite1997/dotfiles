@@ -43,10 +43,6 @@ alias wt = git-wt
 
 const herdr_worktree_opener = path self | path expand | path dirname | path join ../../herdr/plugins/worktrunk-windows/scripts/open.cjs | path expand
 
-def "herdr restore" [] {
-  ^herdr-app do mod.open --name pi-session-restore | ignore
-}
-
 def "herdr switch" [
   --create (-c)
   branch: string
@@ -115,3 +111,5 @@ $env.PROMPT_INDICATOR = $"($prompt_frame)($prompt_lambda)λ($prompt_frame)
 $env.PROMPT_INDICATOR_VI_INSERT = $env.PROMPT_INDICATOR
 $env.PROMPT_INDICATOR_VI_NORMAL = $env.PROMPT_INDICATOR
 $env.PROMPT_MULTILINE_INDICATOR = $"($prompt_frame)··· (ansi reset)"
+
+source ($config_dir | path join herdr-pi-restore.nu)
