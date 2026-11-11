@@ -32,6 +32,18 @@
       backup: true
       force: true
       create: true
+    ~/.config/herdr-app/keys.json:
+      path: herdr/app/keys.json
+      relink: true
+      backup: true
+      force: true
+      create: true
+    ~/.config/herdr-app/mods/modal-picker:
+      path: herdr/app/mods/modal-picker
+      relink: true
+      backup: true
+      force: true
+      create: true
     ~/AppData/Roaming/alacritty/alacritty.toml:
       path: config/alacritty/alacritty.toml
       relink: true
