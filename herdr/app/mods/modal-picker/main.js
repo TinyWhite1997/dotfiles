@@ -76,8 +76,10 @@ export default class ModalPicker extends View {
   render() {
     const t = theme();
     const rows = this.rows();
+    const items = rows.flatMap((row, index) =>
+      index === 0 || row.space.id !== rows[index - 1].space.id ? [{ heading: row.space }, row] : [row]);
     this.at = Math.max(0, Math.min(this.at, rows.length - 1));
-    if (rows.length) this.scroll.scroll_to_item(this.at);
+    if (rows.length) this.scroll.scroll_to_item(items.indexOf(rows[this.at]));
     return v_flex()
       .id("modal-picker")
       .track_focus(this.handle)
@@ -97,11 +99,13 @@ export default class ModalPicker extends View {
           .child(Input.new(this.input).flex_1().h_full().text_color(t.foreground))
         : div().text_size(12).text_color(t.muted).child(this.query ? `Search: ${this.query}  (/ to edit)` : "/ to search"))
       .child(rows.length
-        ? v_flex().id("picker-list").h(Math.min(360, rows.length * 52)).min_h(0)
+        ? v_flex().id("picker-list").h(Math.min(360, rows.length * 52 + (items.length - rows.length) * 29)).min_h(0)
           .overflow_y_scrollbar().track_scroll(this.scroll)
-          .children(rows.map((row, index) =>
-            h_flex().id(`row-${row.id}`).h(52).flex_none().px(10).gap(10).items_center().rounded(6)
-              .cursor_pointer().bg(index === this.at ? t.hover : t.popover)
+          .children(items.map(row => row.heading
+            ? h_flex().id(`space-${row.heading.id}`).h(29).flex_none().px(10).items_center()
+              .text_size(11).font_semibold().text_color(t.dim).child(row.heading.name)
+            : h_flex().id(`row-${row.id}`).h(52).flex_none().px(10).gap(10).items_center().rounded(6)
+              .cursor_pointer().bg(row === rows[this.at] ? t.hover : t.popover)
               .hover(s => s.bg(t.hover))
               .on_click(() => this.go(row))
               .child(div().w(64).flex_none().text_size(11).text_color(t[row.agent?.status] ?? t.dim)
@@ -110,7 +114,7 @@ export default class ModalPicker extends View {
                 .child(div().truncate().text_color(t.foreground)
                   .child(row.agent ? row.agent.title || row.agent.program.name : row.tab.name))
                 .child(div().truncate().text_size(11).text_color(t.dim)
-                  .child(`${row.space.name} / ${row.tab.name}${row.agent ? ` / ${row.agent.program.name}` : ""}`)))))
+                  .child(`${row.tab.name}${row.agent ? ` / ${row.agent.program.name}` : ""}`)))))
         : div().h(80).text_color(t.dim).child("No matching agents or tabs"))
       .child(div().text_size(11).text_color(t.dim)
         .child(this.searching ? "SEARCH  Enter: go  Esc: close" : "NORMAL  j/k: move  Enter: go  /: search  Esc: close"));

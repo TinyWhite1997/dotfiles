@@ -11,6 +11,22 @@ function picker() {
   }));
   const calls = [];
   const events = {};
+  const world = [
+    { id: 's1', name: 'dotfiles', tabs: [{ id: 'agents', name: 'Fix picker' }] },
+    { id: 's2', name: 'other', tabs: [{ id: 'shell', name: 'Terminal' }] },
+  ];
+  const scrolled = [];
+  const element = () => new Proxy({ nodes: [], elementId: null }, {
+    get(target, key, receiver) {
+      if (key in target) return target[key];
+      return (...args) => {
+        if (key === 'child') target.nodes.push(args[0]);
+        if (key === 'children') target.nodes.push(...args[0]);
+        if (key === 'id') target.elementId = args[0];
+        return receiver;
+      };
+    },
+  });
   let value = '';
   let focus = 'normal';
   const cx = {
@@ -23,7 +39,9 @@ function picker() {
     .replace('export default class ModalPicker', 'globalThis.ModalPicker = class ModalPicker');
   const context = vm.createContext({
     View: class {},
-    ScrollHandle: { new: () => ({}) },
+    div: element, v_flex: element, h_flex: element,
+    theme: () => ({}),
+    ScrollHandle: { new: () => ({ scroll_to_item: index => scrolled.push(index) }) },
     InputState: {
       new: () => ({
         on(name, fn) { events[name] = fn; },
@@ -32,10 +50,7 @@ function picker() {
       }),
     },
     agents: () => all,
-    spaces: () => [
-      { name: 'dotfiles', tabs: [{ id: 'agents', name: 'Fix picker' }] },
-      { name: 'other', tabs: [{ id: 'shell', name: 'Terminal' }] },
-    ],
+    spaces: () => world,
     props: () => ({ overlay: 'picker-overlay' }),
     closeOverlay: id => calls.push(['close', id]),
     run: (...args) => calls.push(JSON.parse(JSON.stringify(args))),
@@ -44,7 +59,7 @@ function picker() {
   const view = new context.ModalPicker();
   view.init({}, cx);
   return {
-    view, calls, all,
+    view, calls, all, world, scrolled,
     focus: () => focus,
     key: (key, modifiers = {}) => view.key({ key, modifiers }, cx),
     type(text) { value = text; events.change({}, cx); },
@@ -119,4 +134,29 @@ test('search combines with status and can jump to an ordinary tab', () => {
   assert.deepEqual(other.calls, [
     ['close', 'picker-overlay'], ['tab.select', { id: 'shell' }],
   ]);
+});
+
+test('space headings group results without becoming keyboard navigation targets', () => {
+  const p = picker();
+  p.world[1].name = 'dotfiles';
+  const list = p.view.render().nodes.find(node => node.elementId === 'picker-list');
+  assert.deepEqual(Array.from(list.nodes, node => node.elementId),
+    ['space-s1', 'row-t0', 'row-t1', 'row-t2', 'row-t3', 'space-s2', 'row-shell']);
+  p.key('k');
+  p.view.render();
+  assert.equal(p.scrolled.at(-1), 6);
+  p.key('enter');
+  assert.deepEqual(p.calls.at(-1), ['tab.select', { id: 'shell' }]);
+});
+
+test('status and text filters remove empty space groups', () => {
+  const p = picker();
+  p.key('w');
+  let list = p.view.render().nodes.find(node => node.elementId === 'picker-list');
+  assert.deepEqual(Array.from(list.nodes, node => node.elementId), ['space-s1', 'row-t0']);
+  p.key('a');
+  p.type('OTHER Terminal');
+  list = p.view.render().nodes.find(node => node.elementId === 'picker-list');
+  assert.deepEqual(Array.from(list.nodes, node => node.elementId), ['space-s2', 'row-shell']);
+  assert.equal(p.scrolled.at(-1), 1);
 });
