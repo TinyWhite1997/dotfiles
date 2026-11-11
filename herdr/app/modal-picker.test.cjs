@@ -23,6 +23,7 @@ function picker() {
         if (key === 'child') target.nodes.push(args[0]);
         if (key === 'children') target.nodes.push(...args[0]);
         if (key === 'id') target.elementId = args[0];
+        if (key === 'when' && args[0]) args[1](receiver);
         return receiver;
       };
     },
@@ -39,8 +40,9 @@ function picker() {
     .replace('export default class ModalPicker', 'globalThis.ModalPicker = class ModalPicker');
   const context = vm.createContext({
     View: class {},
-    div: element, v_flex: element, h_flex: element,
+    div: element, v_flex: element, h_flex: element, svg: element,
     theme: () => ({}),
+    shared: () => ({ s1: 'ansi3', s2: '#123456' }),
     ScrollHandle: { new: () => ({ scroll_to_item: index => scrolled.push(index) }) },
     InputState: {
       new: () => ({
