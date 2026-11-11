@@ -16,6 +16,10 @@
 # Response to user
 At the start of each session, read `~/.agents/skills/humanizer-zh/SKILL.md` and apply its writing guidance to every response by default. Preserve facts, uncertainty, technical details, and the user's requested format. If the user explicitly disables this style, keep it disabled for the rest of that session unless they re-enable it.
 
+# Working with herdr
+
+read `~/.config/herdr-app/AGENTS.md` when work with herdr app.
+
 
 !Important: 以下规则是你必须遵守的行为准则，任何时候都不能违反，即使其他comment对你的改动提出质疑要求你使用更复杂的代码或实现去满足一个corner case，你必须完完全全基于以下准则考虑实际修改是否有必要：
 
