@@ -88,16 +88,9 @@ export default class ModalPicker extends View {
       .child(h_flex().items_center().justify_between()
         .child(div().text_size(15).font_semibold().text_color(t.foreground).child("Go to..."))
         .child(div().text_size(11).text_color(t.dim).child(`${rows.length} results`)))
-      .child(h_flex().gap(6).children(Object.entries(FILTERS).map(([key, status]) =>
-        div().id(`filter-${key}`).px(8).py(5).rounded(5).cursor_pointer()
-          .bg(this.status === status ? t.hover : t.background)
-          .text_color(this.status === status ? t.foreground : t.dim)
-          .on_click((_e, cx) => { this.status = status; this.at = 0; cx.notify(); })
-          .child(`${key}: ${status}`))))
-      .child(this.searching
-        ? h_flex().h(36).px(10).items_center().rounded(7).border_1().border_color(t.accent).bg(t.background)
-          .child(Input.new(this.input).flex_1().h_full().text_color(t.foreground))
-        : div().text_size(12).text_color(t.muted).child(this.query ? `Search: ${this.query}  (/ to edit)` : "/ to search"))
+      .when(this.searching, el => el.child(
+        h_flex().h(36).px(10).items_center().rounded(7).border_1().border_color(t.accent).bg(t.background)
+          .child(Input.new(this.input).flex_1().h_full().text_color(t.foreground))))
       .child(rows.length
         ? v_flex().id("picker-list").h(Math.min(420, rows.length * 32 + (items.length - rows.length) * 29)).min_h(0)
           .overflow_y_scrollbar().track_scroll(this.scroll)
@@ -115,7 +108,13 @@ export default class ModalPicker extends View {
               .when(row.agent !== null, el => el.child(div().max_w(220).truncate().text_size(11).text_color(t.dim)
                 .child(`${row.tab.name} / ${row.agent.program.name}`)))))
         : div().h(80).text_color(t.dim).child("No matching agents or tabs"))
-      .child(div().text_size(11).text_color(t.dim)
-        .child(this.searching ? "SEARCH  Enter: go  Esc: close" : "NORMAL  j/k: move  Enter: go  /: search  Esc: close"));
+      .child(this.searching
+        ? div().text_size(11).text_color(t.dim).child("SEARCH  Enter:go  Esc:close")
+        : h_flex().gap(8).text_size(11).text_color(t.dim)
+          .children(Object.entries(FILTERS).map(([key, status]) =>
+            div().id(`filter-${key}`).cursor_pointer()
+              .on_click((_e, cx) => { this.status = status; this.at = 0; cx.notify(); })
+              .child(this.status === status ? `[${key}:${status}]` : `${key}:${status}`)))
+          .child(div().child("j/k:move  /:search  Enter:go  Esc:close")));
   }
 }
