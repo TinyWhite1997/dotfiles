@@ -99,7 +99,7 @@ export default class ModalPicker extends View {
           .child(Input.new(this.input).flex_1().h_full().text_color(t.foreground))
         : div().text_size(12).text_color(t.muted).child(this.query ? `Search: ${this.query}  (/ to edit)` : "/ to search"))
       .child(rows.length
-        ? v_flex().id("picker-list").h(Math.min(360, rows.length * 32 + (items.length - rows.length) * 29)).min_h(0)
+        ? v_flex().id("picker-list").h(Math.min(420, rows.length * 32 + (items.length - rows.length) * 29)).min_h(0)
           .overflow_y_scrollbar().track_scroll(this.scroll)
           .children(items.map(row => row.heading
             ? h_flex().id(`space-${row.heading.id}`).h(29).flex_none().px(10).items_center()

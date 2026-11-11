@@ -4,7 +4,7 @@
   "overlay": {
     "kind": "popup",
     "at": "top",
-    "offset": 40,
+    "offset": 64,
     "width": 720,
     "height": 0.8
   }
