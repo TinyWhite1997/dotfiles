@@ -44,12 +44,6 @@
       backup: true
       force: true
       create: true
-    ~/.config/herdr-app/mods/copy-mode:
-      path: herdr/app/mods/copy-mode
-      relink: true
-      backup: true
-      force: true
-      create: true
     ~/AppData/Roaming/alacritty/alacritty.toml:
       path: config/alacritty/alacritty.toml
       relink: true
