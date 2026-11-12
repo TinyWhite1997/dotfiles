@@ -1,0 +1,8 @@
+{
+  "global": {
+    "ctrl-shift-y": "mod.open:copy-mode"
+  },
+  "mod:copy-mode": {
+    "escape": "copy-mode.cancel"
+  }
+}

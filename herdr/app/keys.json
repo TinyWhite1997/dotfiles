@@ -49,6 +49,7 @@
     "ctrl-shift-n": "space.new",
     "ctrl-shift-t": "tab.new",
     "ctrl-shift-k": "mod.open:modal-picker",
+    "ctrl-shift-y": "mod.open:copy-mode",
     "ctrl-shift-p": "app.palette",
     "ctrl-,": "app.settings",
     "ctrl-shift-o": "pane.split:right",
@@ -59,6 +60,9 @@
     "ctrl-shift-l": "layout.switch",
     "f2": "tab.rename",
     "shift-f2": "space.rename"
+  },
+  "mod:copy-mode": {
+    "escape": "copy-mode.cancel"
   },
   "terminal": {
     "ctrl-backspace": "send:\u0017",

@@ -1,0 +1,10 @@
+{
+  "place": "none",
+  "title": "Copy mode",
+  "overlay": {
+    "kind": "window",
+    "width": 0.9,
+    "height": 0.85,
+    "frame": "none"
+  }
+}
