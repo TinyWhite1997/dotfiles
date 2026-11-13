@@ -18,7 +18,7 @@ function Get-ChildItem { Record 'junction-scan' @() }
 
 function node {
     Record 'node' $args
-    if ($args[0] -eq '--version') { 'v24.0.0'; return }
+    if ($args[0] -eq '--version') { 'v27.0.0-alpha.0.0.0'; return }
     if ($args[0] -like '*smoke.mjs') { throw 'Installation must not depend on remote Hindsight availability.' }
     if (($global:InstallerTestFail -eq 'preflight' -and $args -contains '--check') -or
         ($global:InstallerTestFail -eq 'config' -and $args -notcontains '--check')) { $global:LASTEXITCODE = 1 }

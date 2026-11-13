@@ -61,7 +61,7 @@ try {
         Refresh-Path
     }
     $NodeVersion = & node --version
-    if ($LASTEXITCODE -ne 0 -or [version]$NodeVersion.TrimStart('v') -lt [version]'22.0') {
+    if ($LASTEXITCODE -ne 0 -or $NodeVersion -notmatch '^v(?<Major>\d+)\.' -or [int]$Matches.Major -lt 22) {
         throw 'Node.js 22+ is required; upgrade Node and retry.'
     }
 
