@@ -1,7 +1,7 @@
 ---
 name: finish-pr
 description: Finish, shepherd, or watch an Azure DevOps pull request using Agency's native PR watcher. Use when asked to drive a PR to merge, wait for builds/review, or finish-pr. Handles long waits without model polling and hands code/review work back to pi.
-compatibility: Requires a working agency CLI on PATH; the pi Agency extension starts automatically. Fabric full-code mode also needs the long-wait executor configuration documented in pi/README.md.
+compatibility: Requires a working agency CLI on PATH; the pi Agency extension starts automatically.
 ---
 
 # Finish PR
@@ -37,18 +37,6 @@ there is work for you, the PR merges, or watching fails.
 Do not poll the PR in parallel, wrap this in a sleep loop, schedule repeated
 prompts, or lower `max_wait_seconds` just to see progress. Progress is not a
 handoff and does not need a model response.
-
-### Fabric full-code mode
-
-Use the captured `extensions.agency_call_tool` through `fabric_exec` after
-inspecting its schema. Execute **one wait per fabric_exec program** and return
-its result, checking `isError`. The executor must allow the whole wait plus
-startup/cleanup time. The documented configuration sets
-`executor.maxTimeoutMs: 2100000` and
-`executor.hostCallTimeouts["extensions.agency_call_tool"]: 2100000` (35 minutes).
-If requesting a longer `max_wait_seconds`, first arrange a matching executor
-ceiling and per-call `timeoutMs`; do not silently shorten the PR wait instead.
-Reload/restart pi after changing this configuration.
 
 ## Act on the result
 

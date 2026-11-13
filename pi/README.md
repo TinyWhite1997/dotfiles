@@ -94,7 +94,7 @@ is not installed yet. Restart existing agent sessions after changing the default
 ## Goal-X
 
 The default package is `pi-goal-x@0.32.3`, pinned to the version checked with
-Pi `1.0.0` and Fabric `0.104.1`. `/goal <idea>` discusses a plan before confirmation;
+Pi `1.0.0`. `/goal <idea>` discusses a plan before confirmation;
 `/goal-direct <objective>` starts immediately. `/sisyphus` plans ordered work.
 Use `/goal-list` and `/goal-focus` to switch between open goals, and
 `/goal-pause` / `/goal-resume` to stop or continue the focused goal.
@@ -107,11 +107,11 @@ Use `/goal-list` and `/goal-focus` to switch between open goals, and
 - `autoSelectSingleGoal: false`: a fresh session does not automatically focus
   the project's only open goal. Select and explicitly resume it yourself.
 - `auditorProjectResources: false`: the independent auditor uses its isolated
-  SDK session, not the parent's extensions or Fabric tool restrictions.
+  SDK session, not the parent's extensions.
 
 Auditing remains enabled by default and uses the current model unless changed
 in `/goal-settings`. It adds model calls. Its tools include `bash`, so isolation
-from extensions is **not** a read-only OS sandbox or inherited Fabric approval policy.
+from extensions is **not** a read-only OS sandbox.
 All installers link the settings into Pi's agent directory. Goal files, evidence,
 ledgers and archives live in `.pi/goals/`; keep that directory out of Git.
 Old goals are not migrated from the other package's session format.
@@ -121,79 +121,41 @@ must remove `npm:@narumitw/pi-goal` before using Goal-X: both register `/goal`,
 and installers install listed packages without pruning unlisted ones.
 Restart Pi after migration rather than reloading an in-flight goal.
 
-## Fabric, billion-context, and Goal-X
+## billion-context and Goal-X
 
-The package list keeps `pi-fabric` for agents and workflow orchestration, and installs
-the main `billion-context` package for context compression. Do not also install the
-legacy `billion-context-pi` package.
+The package list installs the main `billion-context` package for context
+compression and sub-agent delegation. Do not also install the legacy
+`billion-context-pi` or standalone `billion-context-pi-subagents` packages.
 
-Keep Fabric in orchestration-only mode so billion-context's native `compress`,
-`decompress`, `search_context`, and `acp_status` tools remain visible to the model:
-
-```json
-{
-  "fullCodeMode": false
-}
-```
-
-Disable billion-context's bundled subagents so Fabric remains the only subagent
-implementation. Put this in `~/.config/billion-context/billion-context.json`:
+Configure the bundled subagents in
+`~/.config/billion-context/billion-context.json`:
 
 ```json
 {
   "pi": {
-    "subagents": false
-  }
-}
-```
-
-Use Fabric's `agents.run()` / `agents.spawn()` and workflow helpers for child
-tasks. Goal-X tools stay on Pi's native tool path in orchestration-only mode;
-they are not called through `extensions.*` inside `fabric_exec`.
-
-There is no `goal_complete` or `goal_wait` in Goal-X. Completion uses
-`update_goal({status: "complete"})`. New external-wait declarations require
-Goal-X's opt-in `strictExecutionContract`; leave it off for ordinary auto-continuation.
-
-Merge this into the machine-local `~/.pi/agent/fabric.json`, preserving other
-executor settings and timeout entries (including Agency's timeout):
-
-```json
-{
-  "fullCodeMode": false,
-  "executor": {
-    "maxTimeoutMs": 86400000,
-    "hostCallTimeouts": {
-      "extensions.agency_call_tool": 2100000
+    "subagents": {
+      "enabled": true,
+      "maxDepth": 2,
+      "maxConcurrent": 5
     }
   }
 }
 ```
-The 24-hour executor ceiling preserves the existing 35-minute Agency allowance;
-Goal-X runs directly through Pi and does not use a Fabric host-call timeout in this mode.
 
-Fabric's compaction engine is unchanged; Goal-X saves state to disk and observes
-Pi's compaction events.
+This keeps one sub-agent implementation and provides the `researcher`,
+`planner`, `reviewer`, `worker`, and `oracle` roles. Changes take effect in a
+new Pi session.
 
-The offline smoke probe loads the real installed extensions with a scripted
-provider: exclusive Fabric declarations, captured reads, automatic continuation,
-isolated audit reads using the parent's provider, rejection without archival,
-and approval with termination/archival. It makes no paid model calls:
+Goal-X tools stay on Pi's native tool path. There is no `goal_complete` or
+`goal_wait`; completion uses `update_goal({status: "complete"})`. New
+external-wait declarations require Goal-X's opt-in `strictExecutionContract`;
+leave it off for ordinary auto-continuation.
 
-```bash
-node pi/goal-x-fabric-smoke.mjs <pi-package-dir> <fabric-package-dir> <goal-x-package-dir>
-```
+Keep goal ownership in the parent session. Do not resume its goal in workers or
+enable automatic single-goal selection. Use fresh task-scoped children rather
+than forks inheriting an active goal transcript until that path is verified.
 
-This is not a full compatibility guarantee: interactive dialogs, Escape during
-an audit, automatic compaction under context pressure, and resumed/forked Fabric
-workers are not covered. Goal-X's delegated-session guard recognizes
-`PI_SUBAGENT_CHILD`/`PI_SUBAGENT_DEPTH`, not Fabric's markers. Keep goal ownership
-in the parent; do not resume its goal in workers or enable automatic single-goal
-selection. Use fresh task-scoped children rather than forks inheriting an active
-goal transcript until that path is verified.
-
-`herdr-agent-name.ts` skips both `PI_SUBAGENT_CHILD=1` and non-empty
-`PI_FABRIC_PARENT_RUN` children, including Fabric actors, so they do not rename
+`herdr-agent-name.ts` skips `PI_SUBAGENT_CHILD=1` children so they do not rename
 inherited parent panes.
 
 ## Agency MCP (automatic)
@@ -252,25 +214,6 @@ Dotbot skill glob includes `agent/skills/finish-pr`. To try it without installin
 pi --skill ./pi/agent/skills/finish-pr/SKILL.md
 ```
 
-For Fabric full-code mode, merge this into `~/.pi/agent/fabric.json`, preserving
-other executor settings and existing `hostCallTimeouts` entries:
-
-```json
-{
-  "executor": {
-    "maxTimeoutMs": 86400000,
-    "hostCallTimeouts": {
-      "extensions.agency_call_tool": 2100000
-    }
-  }
-}
-```
-
-This gives captured Agency calls a 35-minute whole-program deadline (the default
-Fabric ceiling is only 15 minutes). The shared ceiling stays at 24 hours for
-Goal-X auditing; unrelated calls retain their own configured/default deadlines.
-Run one wait per Fabric program. Longer PR waits require a matching executor
-ceiling and per-invocation `timeoutMs`. Reload/restart Pi after configuration changes.
 The watcher can requeue policies and conditionally rebase/push: use `dry_run: true`
 for read-only monitoring, and do not run parallel model polling alongside it.
 
@@ -317,13 +260,10 @@ skill pack is not loaded by this flag.
 These two integrations require Pi's `registerMcpServer` API and built-in MCP support
 (tested with Pi 0.99.2). They retain the opt-in flags and official skills, but Pi now
 owns OAuth, connection cleanup, tool discovery, and result handling; no `mcp-remote`
-process is started. Agency and Fabric are unchanged.
+process is started. Agency is unchanged.
 
 - Tools use `mcp__amplitude__<tool>` and `mcp__revenuecat__<tool>` names and default
-  to `codemode` exposure. Discover them through native codemode/tool search or Fabric's
-  `tools.search`. Fabric full-code mode can call them as
-  `extensions.mcp__revenuecat__<tool>(...)` / `extensions.mcp__amplitude__<tool>(...)`
-  without changing Fabric configuration.
+  to `codemode` exposure. Discover them through native codemode/tool search.
 - Existing `mcp-remote` credentials are not imported. Sign in again inside the
   enabled session; Pi stores its tokens in `~/.pi/agent/mcp-auth.json`.
 - `/amplitude-status` and `/revenuecat-status` point to the native `/mcp` UI.

@@ -3,7 +3,7 @@ const { registerHooks } = require("node:module");
 const { test } = require("node:test");
 
 // Exercise the real factory without loading Pi's model clients or running hooks.
-test("Herdr naming skips pi-subagents and Fabric children", async (t) => {
+test("Herdr naming skips pi-subagents children", async (t) => {
   const originalEnv = { ...process.env };
   const hooks = registerHooks({
     resolve(specifier, context, nextResolve) {
@@ -20,23 +20,14 @@ test("Herdr naming skips pi-subagents and Fabric children", async (t) => {
   });
   const initialize = (await import("../herdr-agent-name.ts")).default;
 
-  for (const [label, subagent, fabric, actor, skipped] of [
-    ["main", undefined, undefined, undefined, false],
-    ["empty markers", "0", "", undefined, false],
-    ["pi-subagents", "1", undefined, undefined, true],
-    ["Fabric worker", undefined, "run-1", undefined, true],
-    ["Fabric actor", undefined, "run-2", "actor-1", true],
-    ["nested child", "1", "run-3", undefined, true],
+  for (const [label, subagent, skipped] of [
+    ["main", undefined, false],
+    ["empty marker", "0", false],
+    ["pi-subagents", "1", true],
   ]) {
     await t.test(label, () => {
-      for (const [key, value] of Object.entries({
-        PI_SUBAGENT_CHILD: subagent,
-        PI_FABRIC_PARENT_RUN: fabric,
-        PI_FABRIC_ACTOR_ID: actor,
-      })) {
-        if (value === undefined) delete process.env[key];
-        else process.env[key] = value;
-      }
+      if (subagent === undefined) delete process.env.PI_SUBAGENT_CHILD;
+      else process.env.PI_SUBAGENT_CHILD = subagent;
       const registered = [];
       const exitHandlers = new Set(process.listeners("exit"));
       try {
