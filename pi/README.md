@@ -121,49 +121,56 @@ must remove `npm:@narumitw/pi-goal` before using Goal-X: both register `/goal`,
 and installers install listed packages without pruning unlisted ones.
 Restart Pi after migration rather than reloading an in-flight goal.
 
-## Fabric agents and Goal-X
+## Fabric, billion-context, and Goal-X
 
-The package list uses `pi-fabric` instead of `pi-subagents`. Use Fabric's
-`agents.run()` / `agents.spawn()` and workflow helpers for child tasks; old
-`subagent` / `runs.run()` workflows are not interchangeable with these APIs.
+The package list keeps `pi-fabric` for agents and workflow orchestration, and installs
+the main `billion-context` package for context compression. Do not also install the
+legacy `billion-context-pi` package.
 
-Goal-X tools work through Fabric capture in full code mode. Discover schemas
-with `tools.list` / `tools.describe`, then call `extensions.get_goal`,
-`extensions.create_goal`, `extensions.update_goal`, `extensions.set_goal_tasks`,
-`extensions.update_goal_task`, or the three drafting tools (`goal_question`,
-`goal_questionnaire`, `propose_goal_draft`) as appropriate. Call lifecycle,
-confirmation and wait operations alone in a Fabric program, and inspect their
-results; do not batch work after a terminating operation.
+Keep Fabric in orchestration-only mode so billion-context's native `compress`,
+`decompress`, `search_context`, and `acp_status` tools remain visible to the model:
+
+```json
+{
+  "fullCodeMode": false
+}
+```
+
+Disable billion-context's bundled subagents so Fabric remains the only subagent
+implementation. Put this in `~/.config/billion-context/billion-context.json`:
+
+```json
+{
+  "pi": {
+    "subagents": false
+  }
+}
+```
+
+Use Fabric's `agents.run()` / `agents.spawn()` and workflow helpers for child
+tasks. Goal-X tools stay on Pi's native tool path in orchestration-only mode;
+they are not called through `extensions.*` inside `fabric_exec`.
 
 There is no `goal_complete` or `goal_wait` in Goal-X. Completion uses
 `update_goal({status: "complete"})`. New external-wait declarations require
 Goal-X's opt-in `strictExecutionContract`; leave it off for ordinary auto-continuation.
-Do not copy old Goal tool names into Fabric. In Fabric `0.104.1`, `capture.keepVisible`
-is a legacy preference, not an escape from full-code declarations. No foreground
-tool exceptions are needed for the tested captured execution path.
 
 Merge this into the machine-local `~/.pi/agent/fabric.json`, preserving other
 executor settings and timeout entries (including Agency's timeout):
 
 ```json
 {
-  "fullCodeMode": true,
+  "fullCodeMode": false,
   "executor": {
     "maxTimeoutMs": 86400000,
     "hostCallTimeouts": {
-      "extensions.update_goal": 86400000
+      "extensions.agency_call_tool": 2100000
     }
   }
 }
 ```
-
-A call to `extensions.update_goal` raises its enclosing Fabric program's deadline
-to **24 hours**, Fabric's supported maximum. This is a cancellation timeout for
-that whole invocation, not a target review duration or a separate timer per
-review step. The shared `maxTimeoutMs` must also be 24 hours or it would clamp
-the audit allowance. Ordinary calls retain their default deadlines; Agency
-retains its 35-minute allowance. Manual cancellation and provider/tool-specific
-limits still apply, and a long audit can consume paid model calls.
+The 24-hour executor ceiling preserves the existing 35-minute Agency allowance;
+Goal-X runs directly through Pi and does not use a Fabric host-call timeout in this mode.
 
 Fabric's compaction engine is unchanged; Goal-X saves state to disk and observes
 Pi's compaction events.
