@@ -7,23 +7,25 @@ compatibility: Requires a working agency CLI on PATH; the pi Agency extension st
 # Finish PR
 
 Use Agency's watcher, not a model-written polling loop. It waits natively, can
-requeue expired build policies and conditionally rebase/push, and returns when
+requeue expired build policies and merge target-branch updates for conflicts, and returns when
 there is work for you, the PR merges, or watching fails.
 
 ## Start one long wait
 
 1. Confirm the target PR and the user's intent. A request only to inspect/watch
    status is read-only: use `dry_run: true`. Mutating PR completion can requeue
-   policies and rebase/force-push with a lease; do not do that without authorization.
+   policies and merge/push target-branch updates; do not do that without authorization.
+   The current watcher never force-pushes.
    Do not open a PR or change branches merely to start a watch.
 2. Pi automatically enables Agency when `agency --version` succeeds on PATH.
    If Agency tools are missing, check `/agency-status`; install/fix the CLI and
    restart Pi (or `/reload` if PATH is already updated). Do not attempt a CLI
    fallback when the CLI itself is unavailable.
-   Discover `finish-pr` using `agency_search_tools`, load the default toolset
+   Discover `watch` using `agency_search_tools`, load the returned default toolset
    using `agency_load_toolset` (no custom `toolset_args`), then inspect
-   `finish_pull_request` using `agency_get_tool_schema`.
-3. Call `agency_call_tool` with `toolset_id: "finish-pr"`,
+   `finish_pull_request` using `agency_get_tool_schema`. Reuse the canonical
+   `toolset_id` returned by loading (currently `watch`, formerly `finish-pr`).
+3. Call `agency_call_tool` with that canonical `toolset_id` (currently `"watch"`),
    `tool_name: "finish_pull_request"`, and an `arguments` object. Pass
    `pull_request` as a URL or string id when known; omit it to use the current
    working directory's branch. Keep `max_wait_seconds` at its default **1800**
@@ -63,7 +65,7 @@ checks or fix unrelated infrastructure/target-branch failures to make it green.
 For an explicitly requested one-time, read-only check, use:
 
 ```bash
-agency finish-pr <pr-url-or-id> --once --dry-run
+agency watch finish-pr <pr-url-or-id> --once --dry-run
 ```
 
 A native long foreground CLI watch is also possible, but first ensure the shell

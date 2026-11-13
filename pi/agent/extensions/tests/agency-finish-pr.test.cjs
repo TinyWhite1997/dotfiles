@@ -47,7 +47,7 @@ class Transport {
   static instances = [];
   static mode = "normal";
   constructor(options) {
-    if (Transport.mode === "real-stdio" && options.args[1] === "finish-pr") {
+    if (Transport.mode === "real-stdio" && options.args[1] === "watch") {
       const native = new NativeStdio({ ...options, command: process.execPath, args: ["-e", stdioFixture] });
       Transport.instances.push(native);
       return native;
@@ -59,14 +59,14 @@ class Transport {
     Transport.instances.push(this);
   }
   async start() {
-    if (this.options.args[1] === "finish-pr" && this.mode === "spawn-error") {
+    if (this.options.args[1] === "watch" && this.mode === "spawn-error") {
       throw new Error("agency executable missing");
     }
   }
   receive(message) { queueMicrotask(() => this.onmessage?.({ jsonrpc: "2.0", ...message })); }
   async send(message) {
     this.messages.push(message);
-    const finish = this.options.args[1] === "finish-pr";
+    const finish = this.options.args[1] === "watch";
     if (message.method === "initialize") {
       if ((finish && this.mode === "handshake-held") || (!finish && this.mode === "gateway-handshake-held")) return;
       if ((finish && this.mode === "handshake-error") || (!finish && this.mode === "gateway-error")) {
@@ -174,7 +174,7 @@ test("Agency automatic startup and finish-pr lifecycle", async (t) => {
     const ready = () => events.get("before_agent_start")({ systemPrompt: "base" });
     if (waitForReady) await ready();
     const call = (args = {}, signal, onUpdate, overrides = {}) => tools.get("agency_call_tool").execute(
-      "test", { toolset_id: "finish-pr", tool_name: "finish_pull_request", arguments: args, ...overrides },
+      "test", { toolset_id: "watch", tool_name: "finish_pull_request", arguments: args, ...overrides },
       signal, onUpdate, ctx,
     );
     return { call, tools, ctx, shutdown, start, ready, notices, probes, events, commands };
@@ -203,7 +203,7 @@ test("Agency automatic startup and finish-pr lifecycle", async (t) => {
     assert.match((await r.ready()).systemPrompt, /^base\n\n## Agency/);
     await r.commands.get("agency-status").handler("", r.ctx);
     assert.match(r.notices.at(-1).message, /Gateway is connected/);
-    for (const overrides of [{ toolset_id: "ado" }, { tool_name: "other_tool" }, { toolset_id: "finish-pr-custom" }]) {
+    for (const overrides of [{ toolset_id: "ado" }, { tool_name: "other_tool" }, { toolset_id: "finish-pr-custom" }, { toolset_id: "watch-custom" }]) {
       assert.match((await r.call({}, undefined, undefined, overrides)).content[0].text, /through gateway/);
     }
     assert.equal(Transport.instances.length, before + 1);
@@ -294,6 +294,17 @@ test("Agency automatic startup and finish-pr lifecycle", async (t) => {
     });
   }
 
+  await t.test("legacy finish-pr alias still uses the dedicated watch backend", async (t) => {
+    const { call } = await runtime(t);
+    const pending = call({}, undefined, undefined, { toolset_id: "finish-pr" });
+    await flush();
+    const watcher = Transport.instances.at(-1);
+    assert.deepEqual(watcher.options.args, ["mcp", "watch"]);
+    watcher.reply("legacy alias handoff");
+    assert.equal((await pending).content[0].text, "legacy alias handoff");
+    assert.equal(watcher.closed, true);
+  });
+
   for (const args of [{}, { pull_request: "123", dry_run: true, interval_seconds: 120, max_wait_seconds: 3600 }]) {
     await t.test(`heartbeats survive 180s and 30m; arguments ${JSON.stringify(args)}`, async (t) => {
       const { call, ctx } = await runtime(t);
@@ -304,7 +315,7 @@ test("Agency automatic startup and finish-pr lifecycle", async (t) => {
         .then(value => { outcome = { value }; }, error => { outcome = { error }; });
       await flush();
       const watcher = Transport.instances.at(-1);
-      assert.deepEqual(watcher.options.args, ["mcp", "finish-pr"]);
+      assert.deepEqual(watcher.options.args, ["mcp", "watch"]);
       assert.equal(watcher.options.command, "agency");
       assert.equal(watcher.options.cwd, ctx.cwd);
       assert.equal(watcher.request.params.name, "finish_pull_request");

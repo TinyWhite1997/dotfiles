@@ -191,9 +191,11 @@ to discover and load any Agency MCP toolset without starting every server.
 
 ### Finish PR long waits
 
-`agency_call_tool` calls targeting the default `finish-pr` toolset's
-`finish_pull_request` tool go directly to `agency mcp finish-pr` over stdio.
+`agency_call_tool` calls targeting the default `watch` toolset's
+`finish_pull_request` tool go directly to `agency mcp watch` over stdio.
+The legacy `finish-pr` toolset alias uses the same dedicated route.
 Discovery/schema lookup still uses Gateway; other tool calls are unchanged.
+After updating the extension, use `/reload` to activate the new routing.
 This avoids Gateway's 180-second backend timeout. The dedicated MCP receives
 Pi's current working directory and is closed on completion, cancellation, error,
 or session shutdown/reload. A 120-second silence timeout is refreshed by Agency's
@@ -214,8 +216,9 @@ Dotbot skill glob includes `agent/skills/finish-pr`. To try it without installin
 pi --skill ./pi/agent/skills/finish-pr/SKILL.md
 ```
 
-The watcher can requeue policies and conditionally rebase/push: use `dry_run: true`
-for read-only monitoring, and do not run parallel model polling alongside it.
+The watcher can requeue policies and merge/push target-branch updates for conflicts;
+it never force-pushes. Use `dry_run: true` for read-only monitoring, and do not run
+parallel model polling alongside it.
 
 Regression check (real MCP SDK, simulated clock; no PR access):
 

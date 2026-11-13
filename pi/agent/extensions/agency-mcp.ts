@@ -169,7 +169,7 @@ export default function agencyMcpExtension(pi: ExtensionAPI) {
     const watcher = new Client({ name: "pi-agency-finish-pr", version: "1.0.0" }, { capabilities: {} });
     const watcherTransport = new StdioClientTransport({
       command: "agency",
-      args: ["mcp", "finish-pr"],
+      args: ["mcp", "watch"],
       cwd,
       env: cleanEnvironment(),
       stderr: "pipe",
@@ -275,7 +275,8 @@ export default function agencyMcpExtension(pi: ExtensionAPI) {
 
               const request = params as Record<string, unknown>;
               const result = tool.name === "call_tool" &&
-                request.toolset_id === "finish-pr" && request.tool_name === "finish_pull_request"
+                (request.toolset_id === "watch" || request.toolset_id === "finish-pr") &&
+                request.tool_name === "finish_pull_request"
                 ? await callFinishPr(request.arguments, signal, ctx.cwd, (message) => {
                     onUpdate?.({
                       content: [{ type: "text", text: message }],
