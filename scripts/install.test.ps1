@@ -19,16 +19,16 @@ function Get-ChildItem { Record 'junction-scan' @() }
 function node {
     Record 'node' $args
     if ($args[0] -eq '--version') { 'v24.0.0'; return }
-    if ($args[0] -like '*smoke.mjs') { throw 'Paused Hindsight must not run a network smoke check.' }
+    if ($args[0] -like '*smoke.mjs') { throw 'Installation must not depend on remote Hindsight availability.' }
     if (($global:InstallerTestFail -eq 'preflight' -and $args -contains '--check') -or
         ($global:InstallerTestFail -eq 'config' -and $args -notcontains '--check')) { $global:LASTEXITCODE = 1 }
 }
 function npm.cmd {
     Record 'npm' $args
-    if ($args[2] -like '*/hindsight') { throw 'Paused Hindsight must not install runtime dependencies.' }
+    if ($global:InstallerTestFail -eq 'hindsight-deps' -and $args[2] -like '*/hindsight') { $global:LASTEXITCODE = 1 }
     if ($global:InstallerTestFail -eq 'config-deps' -and $args[2] -like '*/scripts') { $global:LASTEXITCODE = 1 }
 }
-function devtunnel { throw 'Paused Hindsight must not invoke devtunnel.' }
+function devtunnel { throw 'Installation must not authenticate or host a tunnel.' }
 function winget { Record 'winget' $args; if ($args[0] -eq 'list') { $args[2] } }
 function fzf { Record 'fzf' $args; '0.74.4' }
 function git { Record 'git' $args; if ($global:InstallerTestFail -eq 'git') { $global:LASTEXITCODE = 1 } }
@@ -53,13 +53,14 @@ Assert ((Get-Location).Path -eq $Original) 'Working directory was not restored.'
 Reset
 & "$Repo/install.work.ps1" -AgentsOnly
 $Npm = @($global:InstallerTestCalls | Where-Object Name -eq npm)
-Assert ($Npm.Count -eq 1 -and $Npm[0].Arguments[2] -eq "$Repo/scripts") 'Work must install only cleanup writer dependencies.'
+Assert ($Npm.Count -eq 2 -and $Npm[0].Arguments[2] -eq "$Repo/scripts" -and $Npm[1].Arguments[2] -eq "$Repo/hindsight") 'Work must install configuration and Hindsight runtime dependencies.'
+Assert (@($global:InstallerTestCalls | Where-Object { $_.Name -eq 'winget' -and $_.Arguments -contains 'Microsoft.devtunnel' }).Count -gt 0) 'Work AgentsOnly must ensure Dev Tunnels is installed.'
 $Config = @($global:InstallerTestCalls | Where-Object { $_.Name -eq 'node' -and $_.Arguments[0] -like '*configure-agents.mjs' })
-Assert ($Config.Count -eq 2 -and $Config[0].Arguments -contains '--check') 'Work must preflight before cleanup.'
-foreach ($Call in $Config) { Assert ($Call.Arguments -contains 'personal') 'Paused Work must use the managed MCP cleanup path.' }
+Assert ($Config.Count -eq 2 -and $Config[0].Arguments -contains '--check') 'Work must preflight before registration.'
+foreach ($Call in $Config) { Assert ($Call.Arguments -contains 'work') 'Work must register Hindsight instead of removing it.' }
 $Guidance = @($global:InstallerTestCalls | Where-Object { $_.Name -eq 'python' -and $_.Arguments -contains "$Repo/install.conf-agents.yaml" })
 Assert ($Guidance.Count -eq 1 -and $Guidance[0].Profile -eq 'work') 'Work must still pass its profile to Dotbot guidance.'
-Assert ($global:InstallerTestCalls[-1].Arguments[0] -like '*configure-agents.mjs') 'Work must finish after cleanup, without a remote smoke check.'
+Assert ($global:InstallerTestCalls[-1].Arguments[0] -like '*configure-agents.mjs') 'Work must finish after registration, without requiring the remote service.'
 
 Reset
 & "$Repo/install.personal.ps1" -DotbotArgs @('--only', 'link')
@@ -68,13 +69,16 @@ Assert ($Dotbot.Count -eq 2 -and $Dotbot[0].Arguments -contains '--only' -and $D
 Assert (@($global:InstallerTestCalls | Where-Object Name -eq winget).Count -ge 16) 'Shared package installation was skipped.'
 $Npm = @($global:InstallerTestCalls | Where-Object Name -eq npm)
 Assert ($Npm.Count -eq 1 -and $Npm[0].Arguments[2] -eq "$Repo/scripts") 'Personal must install only config dependencies, not Hindsight dependencies.'
+Assert (@($global:InstallerTestCalls | Where-Object { $_.Name -eq 'winget' -and $_.Arguments -contains 'Microsoft.devtunnel' }).Count -eq 0) 'Personal must not install Dev Tunnels.'
+$Config = @($global:InstallerTestCalls | Where-Object { $_.Name -eq 'node' -and $_.Arguments[0] -like '*configure-agents.mjs' })
+foreach ($Call in $Config) { Assert ($Call.Arguments -contains 'personal') 'Personal must remove managed work-memory registrations.' }
 
 Reset
 & "$Repo/install.work.ps1"
 $Config = @($global:InstallerTestCalls | Where-Object { $_.Name -eq 'node' -and $_.Arguments[0] -like '*configure-agents.mjs' })
-Assert ($Config.Count -eq 2 -and $Config[1].Arguments -contains 'personal') 'Full Work installation must also clean up managed Hindsight registrations.'
+Assert ($Config.Count -eq 2 -and $Config[1].Arguments -contains 'work') 'Full Work installation must register Hindsight.'
 Assert (@($global:InstallerTestCalls | Where-Object Name -eq winget).Count -ge 16) 'Full Work must retain shared package installation.'
-Assert (@($global:InstallerTestCalls | Where-Object { $_.Name -eq 'winget' -and $_.Arguments -contains 'Microsoft.devtunnel' }).Count -eq 0) 'Paused Work must not install Dev Tunnels.'
+Assert (@($global:InstallerTestCalls | Where-Object { $_.Name -eq 'winget' -and $_.Arguments -contains 'Microsoft.devtunnel' }).Count -gt 0) 'Full Work must ensure Dev Tunnels is installed.'
 Assert ($global:InstallerTestCalls[-1].Arguments[0] -like '*configure-agents.mjs') 'Full Work must finish without a remote smoke check.'
 
 foreach ($DryRun in @('--dry-run', '-n')) {
@@ -83,7 +87,7 @@ foreach ($DryRun in @('--dry-run', '-n')) {
     Assert (@($global:InstallerTestCalls | Where-Object Name -eq 'junction-scan').Count -eq 0) 'Dotbot dry-run must not migrate junctions.'
 }
 
-foreach ($Failure in @('config-deps', 'preflight', 'git', 'dotbot', 'config')) {
+foreach ($Failure in @('config-deps', 'preflight', 'hindsight-deps', 'git', 'dotbot', 'config')) {
     Reset
     $global:InstallerTestFail = $Failure
     $Threw = $false

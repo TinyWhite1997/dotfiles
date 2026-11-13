@@ -65,15 +65,21 @@ try {
         throw 'Node.js 22+ is required; upgrade Node and retry.'
     }
 
-    # Keep the config writer to remove our existing MCP registrations safely.
+    # Validate client configuration before changing guidance or MCP registrations.
     & npm.cmd ci --prefix "$PSScriptRoot/scripts"
     if ($LASTEXITCODE -ne 0) { throw 'Agent configuration dependency installation failed.' }
 
     $Configure = Join-Path $PSScriptRoot 'scripts/configure-agents.mjs'
-    # Hindsight is paused for both guidance profiles; reuse the existing Personal cleanup path.
-    $CleanupArgs = @('--profile', 'personal')
-    & node $Configure @CleanupArgs --check
+    $ConfigureArgs = @('--profile', $Profile)
+    & node $Configure @ConfigureArgs --check
     if ($LASTEXITCODE -ne 0) { throw 'Profile preflight failed; agent configuration was not changed.' }
+
+    if ($Profile -eq 'work') {
+        Install-WingetPackage 'Microsoft.devtunnel'
+        Refresh-Path
+        & npm.cmd ci --prefix "$PSScriptRoot/hindsight"
+        if ($LASTEXITCODE -ne 0) { throw 'Hindsight dependency installation failed.' }
+    }
 
     if (-not $AgentsOnly) {
         foreach ($Package in @(
@@ -111,7 +117,7 @@ try {
 
     & $Python "$PSScriptRoot/dotbot/bin/dotbot" -d $PSScriptRoot -c "$PSScriptRoot/install.conf-agents.yaml" @DotbotArgs
     if ($LASTEXITCODE -ne 0) { throw 'Agent guidance symlinks failed. Enable Windows Developer Mode or run with symlink privileges.' }
-    & node $Configure @CleanupArgs
+    & node $Configure @ConfigureArgs
     if ($LASTEXITCODE -ne 0) { throw 'Agent profile configuration failed.' }
     Write-Host "Installed $Profile profile. Restart DeepSeek Harness, Claude Code, Codex and Copilot; /reload Pi."
 } finally {
