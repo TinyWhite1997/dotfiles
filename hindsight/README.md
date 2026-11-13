@@ -89,12 +89,14 @@ Register/start two user-level Windows scheduled tasks:
 pwsh -NoProfile -File ./hindsight/register-host.ps1
 ```
 
-`Hindsight-api` and `Hindsight-tunnel` start at user logon and restart after failures. They run under the signed-in user, not SYSTEM, so Copilot/Dev Tunnels can use that user's credentials. The host must remain awake and logged in. Existing tasks are not overwritten.
+`Hindsight-api` and `Hindsight-tunnel` start at user logon and retry failures every minute (up to 999 times). A repeating one-minute trigger also starts a stopped task; `IgnoreNew` prevents duplicate running instances. Any service exit, including exit code zero, is treated as a failure. The tunnel runner logs output as it arrives and exits on `not authorized`, `unauthorized`, `forbidden`, or HTTP 401/403 output, stopping the native process so Task Scheduler can restart it with fresh authentication. Restarting cannot repair revoked login/permissions or a deleted/expired tunnel: those still require operator action.
+
+They run under the signed-in user, not SYSTEM, so Copilot/Dev Tunnels can use that user's credentials. The host must remain awake and logged in. Existing tasks are not overwritten; when upgrading an existing host, update its triggers explicitly to match `register-host.ps1`.
 
 ```powershell
 Get-ScheduledTask -TaskName 'Hindsight-*'
 Get-Content "$HOME/.hindsight/api.log" -Tail 30
-Get-Content "$HOME/.hindsight/tunnel.log" -Tail 30
+Get-Content "$HOME/.hindsight/tunnel.log","$HOME/.hindsight/tunnel.err.log" -Tail 30
 devtunnel access list <tunnel-id.cluster>
 ```
 
@@ -111,6 +113,7 @@ Get-ScheduledTask -TaskName 'Hindsight-api','Hindsight-tunnel' | Unregister-Sche
 
 ```powershell
 npm test --prefix hindsight
+pwsh -NoProfile -File hindsight/run-service.test.ps1
 node hindsight/smoke.mjs
 # Optional: consumes LLM allowance; creates then deletes an isolated test bank:
 node hindsight/smoke.mjs --memory
