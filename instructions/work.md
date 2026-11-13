@@ -4,9 +4,9 @@
 - This is a work-machine profile, not proof that every task is work-related. For personal tasks, do not query or write work memory. If the scope is unclear, ask before accessing memory.
 - Follow repository instructions and company data-handling requirements.
 
-## Work memory (paused)
+## Work memory
 
-- Hindsight is temporarily disabled. Do not discover its tools, recall, or retain work memory until explicitly re-enabled.
+- Hindsight is enabled. Use it for work-related tasks only; do not access work memory for personal tasks.
 - Preserve existing memory data, credentials, and host configuration.
 
 ## Git push behavior
