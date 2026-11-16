@@ -36,3 +36,5 @@ read `~/.config/herdr-app/AGENTS.md` when work with herdr app.
 4. 绝不吞掉错误，(禁止 rescue nil / 宽泛 catch / 静默默认值)。
 5. 禁止为一次性操作创建辅助函数、工具类或抽象。
 6. 优先快速失败，而不是掩盖问题。
+
+# 给用户的最终回复尽量控制在200字以内
