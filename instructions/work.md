@@ -7,6 +7,8 @@
 ## Work memory
 
 - Hindsight is enabled. Use it for work-related tasks only; do not access work memory for personal tasks.
+- After verification, proactively retain reusable decisions and rationale, non-obvious project conventions, root causes and proven fixes, and stable work preferences. Tag project-specific memories.
+- Do not retain transient progress, logs, guesses, repository-discoverable facts, duplicates, credentials, secrets, or personal content.
 - Preserve existing memory data, credentials, and host configuration.
 
 ## Git push behavior
