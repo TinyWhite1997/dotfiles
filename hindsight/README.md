@@ -6,7 +6,7 @@ Agent → stdio.mjs → HTTPS + tunnel connect token → private Dev Tunnel → 
 
 No Agency, client-side forwarding port, anonymous tunnel access, or manually copied token. Node's MCP SDK handles Streamable HTTP/SSE; `devtunnel token` only issues credentials, never opens a forwarding connection.
 
-Hindsight is temporarily disabled in [the Windows profile installers](../INSTALL.md): both remove this adapter's MCP registrations instead of installing or checking it. The manual setup below is retained for later use; it is not run by normal installation. The shared endpoint remains in `client.work.json`, without credentials.
+The [Windows work installer](../INSTALL.md) installs the client dependencies and registers this adapter for Claude Code, Codex, Copilot CLI and Pi. The personal installer removes only this adapter's registrations. The shared endpoint is in `client.work.json`, without credentials; host setup and connection checks remain explicit steps.
 
 ## Host configuration
 
@@ -48,7 +48,7 @@ Register this **stdio** MCP entry with your agent (use an absolute path):
 }
 ```
 
-For manual Copilot CLI setup, the equivalent is `copilot mcp add hindsight --timeout 180000 -- node <repo>/hindsight/stdio.mjs`. While Hindsight is paused, `install.work.ps1 -AgentsOnly` removes this adapter's registrations rather than adding them.
+For manual Copilot CLI setup, the equivalent is `copilot mcp add hindsight --timeout 180000 -- node <repo>/hindsight/stdio.mjs`. `install.work.ps1 -AgentsOnly` registers the adapter for all four managed clients; `install.personal.ps1 -AgentsOnly` removes its registrations.
 
 An optional second argument explicitly selects another client config file (a missing explicit file is an error). With no argument, local overrides take precedence over the live repository default. If the Hindsight server also uses application API-key authentication, supply `HINDSIGHT_API_KEY` through your client's private environment/secret storage, not Git.
 
@@ -89,12 +89,14 @@ Register/start two user-level Windows scheduled tasks:
 pwsh -NoProfile -File ./hindsight/register-host.ps1
 ```
 
-`Hindsight-api` and `Hindsight-tunnel` start at user logon and restart after failures. They run under the signed-in user, not SYSTEM, so Copilot/Dev Tunnels can use that user's credentials. The host must remain awake and logged in. Existing tasks are not overwritten.
+`Hindsight-api` and `Hindsight-tunnel` start at user logon and retry failures every minute (up to 999 times). A repeating one-minute trigger also starts a stopped task; `IgnoreNew` prevents duplicate running instances. Any service exit, including exit code zero, is treated as a failure. The tunnel runner logs output as it arrives and exits on `not authorized`, `unauthorized`, `forbidden`, or HTTP 401/403 output, stopping the native process so Task Scheduler can restart it with fresh authentication. Restarting cannot repair revoked login/permissions or a deleted/expired tunnel: those still require operator action.
+
+They run under the signed-in user, not SYSTEM, so Copilot/Dev Tunnels can use that user's credentials. The host must remain awake and logged in. Existing tasks are not overwritten; when upgrading an existing host, update its triggers explicitly to match `register-host.ps1`.
 
 ```powershell
 Get-ScheduledTask -TaskName 'Hindsight-*'
 Get-Content "$HOME/.hindsight/api.log" -Tail 30
-Get-Content "$HOME/.hindsight/tunnel.log" -Tail 30
+Get-Content "$HOME/.hindsight/tunnel.log","$HOME/.hindsight/tunnel.err.log" -Tail 30
 devtunnel access list <tunnel-id.cluster>
 ```
 
@@ -111,6 +113,7 @@ Get-ScheduledTask -TaskName 'Hindsight-api','Hindsight-tunnel' | Unregister-Sche
 
 ```powershell
 npm test --prefix hindsight
+pwsh -NoProfile -File hindsight/run-service.test.ps1
 node hindsight/smoke.mjs
 # Optional: consumes LLM allowance; creates then deletes an isolated test bank:
 node hindsight/smoke.mjs --memory

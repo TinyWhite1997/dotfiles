@@ -9,16 +9,16 @@ Run from PowerShell (7 recommended). The two public entrypoints share `install.p
 # Work computer: common dotfiles + work Pi/Copilot guidance.
 .\install.work.ps1
 
-# Already installed dotfiles? Only switch guidance and clean up managed Hindsight MCP entries:
+# Already installed dotfiles? Only switch guidance and Hindsight MCP registrations:
 .\install.work.ps1 -AgentsOnly
 .\install.personal.ps1 -AgentsOnly
 ```
 
-`install.ps1` alone defaults to **personal** for compatibility. Use `-DotbotArgs @('--only', 'link')` to pass explicit arguments to Dotbot. `-AgentsOnly` skips the shared winget package list and common Dotbot configuration, but still runs the guidance-only YAML and MCP cleanup. Python and the Dotbot submodule are required even in this mode.
+`install.ps1` alone defaults to **personal** for compatibility. Use `-DotbotArgs @('--only', 'link')` to pass explicit arguments to Dotbot. `-AgentsOnly` skips the shared winget package list and common Dotbot configuration, but still runs the guidance-only YAML and profile-specific MCP configuration. Work also ensures Dev Tunnels and the Hindsight adapter dependencies are installed. Python and the Dotbot submodule are required even in this mode.
 
 ## Exactly two guidance files
 
-- `instructions/work.md`: work-machine guidance; Hindsight discovery, recall and retention are temporarily disabled.
+- `instructions/work.md`: work-machine guidance; Hindsight is enabled for work-related tasks only.
 - `instructions/personal.md`: personal tasks; never use the work memory service.
 
 Dotbot links DeepSeek Harness, Pi, and Copilot directly to the selected source file, at their native user-level paths:
@@ -33,11 +33,11 @@ Edit `instructions/work.md` or `instructions/personal.md` and the linked file im
 
 The Unix and MSYS2 YAML files use the same variable. Their entrypoints default it to `personal` and reject values other than `work`/`personal`. `DOTFILES_PROFILE=work ./install` (or `./install.msys2`) selects work guidance; this does not configure or clean up MCPs on those platforms. Direct Dotbot invocations must supply `DOTFILES_PROFILE` explicitly.
 
-## Hindsight temporarily disabled
+## Hindsight MCP by profile
 
-Neither Windows profile installs the Hindsight runtime or Dev Tunnels CLI, registers the adapter, or runs its remote smoke check. The work installer no longer accepts `-TunnelId` or `-McpUrl`. The adapter, connection defaults, host setup and tests remain in `hindsight/` for later use; see [hindsight/README.md](hindsight/README.md).
+The work installer installs the Dev Tunnels CLI and Hindsight adapter dependencies, then runs `scripts/configure-agents.mjs --profile work` to register the shared private memory service. It uses `~/.hindsight/client.json` when present, otherwise the live defaults in `hindsight/client.work.json`; no connection prompt or copied default is needed. It does not sign in, create host tasks, or require a remote connection during installation. See [hindsight/README.md](hindsight/README.md) for host setup and connection checks.
 
-Both installers reuse `scripts/configure-agents.mjs --profile personal` for safe cleanup, independently of the selected guidance profile. It removes only Hindsight registrations pointing to this dotfiles adapter, including registrations from an older checkout, from:
+The personal installer runs `scripts/configure-agents.mjs --profile personal` to remove only registrations pointing to this dotfiles adapter, including registrations from an older checkout. It does not install Dev Tunnels or Hindsight adapter dependencies. The managed client files are:
 
 | Client | User/global file |
 | --- | --- |
@@ -47,9 +47,9 @@ Both installers reuse `scripts/configure-agents.mjs --profile personal` for safe
 | Pi | `~/.pi/agent/mcp.json` |
 | Legacy Cursor registration | `~/.cursor/mcp.json` |
 
-Unrelated servers and settings are preserved, including independently configured entries named `hindsight`. Memory data, connection files, credentials and host scheduled tasks are not deleted or stopped. Existing managed registrations are removed on the next full or `-AgentsOnly` installation; pulling the repository alone does not change local MCP settings.
+Unrelated servers and settings are preserved. Work fails preflight on an independently configured entry named `hindsight`; Personal leaves it unchanged. Legacy Cursor registrations are cleanup-only in both profiles. Memory data, connection files, credentials and host scheduled tasks are not deleted or stopped. Full and `-AgentsOnly` installations both apply the selected MCP profile; pulling the repository alone does not change local MCP settings.
 
-The cleanup writer requires Node.js 22+ and `npm ci --prefix scripts`. Invalid JSON/TOML and symlinked MCP configuration files fail preflight before guidance is changed. Existing files get a first-install `.dotfiles-backup`; treat these backups as private. TOML values are preserved, but comments/formatting can change. Updates are atomic per file, not a transaction across clients; rerunning converges safely after an I/O failure.
+The configuration writer requires Node.js 22+ and `npm ci --prefix scripts`. Invalid JSON/TOML and symlinked MCP configuration files fail preflight before guidance is changed. Existing files get a first-install `.dotfiles-backup`; treat these backups as private. TOML values are preserved, but comments/formatting can change. Updates are atomic per file, not a transaction across clients; rerunning converges safely after an I/O failure.
 
 Close clients while installing to avoid concurrent config writes. Restart DeepSeek Harness, Claude Code, Copilot and Codex, and `/reload` Pi afterward: an already-running session can still hold previous guidance or an MCP connection. No permissions or destructive-tool auto-approval settings are changed.
 

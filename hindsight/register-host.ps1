@@ -6,7 +6,10 @@ foreach ($File in @('venv\Scripts\hindsight-api.exe', '.env', 'client.json')) {
 }
 $User = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
 $Shell = (Get-Command pwsh).Source
-$Trigger = New-ScheduledTaskTrigger -AtLogOn -User $User
+$Trigger = @(
+    New-ScheduledTaskTrigger -AtLogOn -User $User
+    New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 1)
+)
 $Principal = New-ScheduledTaskPrincipal -UserId $User -LogonType Interactive -RunLevel Limited
 $Settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) `
     -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) `
