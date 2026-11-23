@@ -1,10 +1,10 @@
-# 划词翻译 · Copilot Luna
+# 划词翻译 · Copilot GPT-6 Luna
 
-Windows 10/11 原生后台小工具：**划选文字 → 附近出现「复制｜翻译」悬浮条 → 左侧复制原文，右侧请求模型并就近显示译文。** 只划选不发送原文。使用系统自带的 Windows PowerShell 5.1、WPF 和 Windows Forms 托盘组件，无额外依赖。
+Windows 10/11 原生后台小工具：**划选文字 → 附近出现「复制｜翻译」悬浮条 → 左侧复制原文，右侧请求模型并就近显示译文。** 只划选不发送原文。界面使用系统自带的 Windows PowerShell 5.1、WPF 和 Windows Forms；默认后端需要 Node.js、已安装并登录的 Copilot CLI 及其随附 SDK。
 
 ## 启动与托盘
 
-双击 `selection-translator/start.cmd`，或在仓库根目录运行：
+先在 Copilot CLI 中完成登录，再双击 `selection-translator\start.cmd`，或在仓库根目录运行：
 
 ```powershell
 powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File .\selection-translator\start.ps1
@@ -25,24 +25,26 @@ powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File .\selection-transla
    译文卡片以白色为主：圆角、轻阴影、无原文区、无输入线框，只保留译文、复制和关闭。短译文自动收缩，长译文限制高度并滚动，可拖动标题区域移动。
 4. 译文框在选区附近显示，靠近右侧/底部时向左/向上调整，限制在所在显示器工作区内，避开任务栏；定位支持负坐标和物理像素 DPI 换算。
 5. 点击其他位置、切换前台应用或暂停时，小按钮消失，不触发请求。相同文字再次划选仍可显示按钮，必须再点击才重新翻译。
-6. 外语 → 简体中文；中文 → 英文，每次最多 8000 个字符。**悬浮条左侧复制原文；译文卡片右上角的「复制」仍只复制译文**，不包含原文或状态提示。
+6. 英文等外语 → 简体中文，不再自动将中文反向翻译成英文，每次最多 8000 个字符。**悬浮条左侧复制原文；译文卡片右上角的「复制」仍只复制译文**，不包含原文或状态提示。
 7. 窗口隐藏到托盘后仍可划词；点击小按钮才重新显示译文框。关闭正在翻译的窗口不会中止后台请求，也不会在完成时突然重新弹出。
 8. Ctrl+Alt+T 是键盘选区的备用入口，同样只显示按钮，不直接发送原文。暂停划词时也暂停该入口。
 
-Luna 的模型名称为 **GPT-5.6 Luna**（`gpt-5.6-luna`）。需要指定其他已获授权的 Responses API 模型或凭据位置时：
+默认模型为 **GPT-6 Luna**（`gpt-6-luna`）。当前账号的模型列表没有 GPT-6.1 Luna，不会把它当作有效模型名或静默替换模型。需要指定其他已获授权模型时：
 
 ```powershell
-.\selection-translator\start.ps1 -Model gpt-5.6-luna -AuthPath "$HOME\.pi\agent\auth.json"
+.\selection-translator\start.ps1 -Model gpt-6.1-sol
 ```
+
+启动脚本自动寻找 `COPILOT_CLI_PATH`、PATH 或 `$HOME\.copilot-cli` 中的 `copilot.exe`，以及 CLI 缓存中的随附 SDK。自定义安装可传入 `-CliPath 'C:\path\copilot.exe' -SdkPath 'C:\path\copilot-sdk\index.js'`。不会修改 CLI 的默认模型、登录文件或全局设置。
 
 ## 登录与隐私
 
-- 复用 `$HOME\.pi\agent\auth.json` 的 `github-copilot` 登录；缺少凭据时需先在 pi 中登录 GitHub Copilot。仅读取文件，刷新令牌仅在内存缓存，不改写原文件。
+- 默认通过 CLI 随附 SDK 复用 Copilot CLI 已有登录，不自行读取、复制或保存令牌。每次翻译使用独立会话，关闭工具、技能、记忆、仓库配置发现、文件钩子和跨会话内容存储；不继承当前聊天上下文。
 - 划选只在本机暂存选中文字，不换取令牌、不调用翻译模型；**点击翻译才联网**。密码控件不读取，请勿主动发送密钥、密码或机密资料。
-- 只发送选中文字，不发送整篇文档；请求设为 `store: false`，不在本地保存原文日志或历史。云端数据处理仍以你的 Copilot 方案和组织策略为准。
+- 只发送选中文字，不发送整篇文档。SDK 可能产生临时会话状态，翻译结束会请求删除会话；强制终止或异常退出不保证完成清理。云端数据处理仍以你的 Copilot 方案和组织策略为准。
 - 读取选区时不发送 Ctrl+C、不读取或改写剪贴板。只有明确点击「复制」才写入剪贴板：悬浮条写入原文，译文框写入译文；复制原文不会发起网络请求。
 - 请求可能消耗订阅配额，不自动重试失败请求；新翻译取消旧请求，避免旧译文覆盖新内容。
-- 使用与仓库现有 Copilot 工具相同的 token exchange + Responses 接口；它不是 GitHub 承诺稳定的通用第三方桌面应用 API，可能随服务更新而失效。
+- 仍支持显式传入 `-AuthPath "$HOME\.pi\agent\auth.json"` 使用旧 pi token exchange + Responses 后端；只有该模式读取 pi 凭据并设置 `store: false`，不会自动回退到它。该非通用公开接口可能随服务更新失效。
 
 ## 限制与排查
 
@@ -50,13 +52,16 @@ Luna 的模型名称为 **GPT-5.6 Luna**（`gpt-5.6-luna`）。需要指定其�
 - 选区读取依赖 UI Automation TextPattern；部分 PDF、终端、游戏、自绘控件无法读取。悬浮条保留原有 8000 字符选区上限，超长原文请在原应用中直接复制，不会静默复制被截断的文本。当前界面不提供原文输入框，也不做 OCR，不会覆盖剪贴板绕过限制。
 - 普通权限下不保证读取管理员权限应用，不自动提权。
 - 位置以鼠标划选结束点为锚点；键盘入口以当前鼠标位置为锚点。原生托盘图标和菜单会遵循 Windows 的显示/折叠规则。
-- 通过 Responses API 的 SSE `response.output_text.delta` 直接显示文字，只在收到完成事件后标记完成；不把推理或完成快照重复追加到译文。
+- 默认直接显示 SDK 的 `assistant.message_delta`；旧 pi 后端使用 Responses API 的 SSE `response.output_text.delta`。只显示译文，不把推理或完成快照重复追加到译文。
 - 首段出现仍取决于模型首字延迟和网络；流式可以省去「必须等整段生成结束才能阅读」的等待，不保证立即出字，也不会用打字动画模拟流式。
-- 模型权限、登录过期、限流或网络错误显示在译文框下方，不会悄悄换模型。**60 秒超时覆盖整个请求和流式读取**；连接中断时保留并明确标注「部分译文」，仍可复制，不自动重试。
+- 模型权限、登录过期、限流或网络错误显示在译文框下方，不会悄悄换模型。SDK 翻译等待上限 60 秒，CLI 启动加读取总体上限 90 秒，清理子进程另留最多约 10 秒；旧 pi 后端为整体 60 秒。连接中断时保留并明确标注「部分译文」，仍可复制，不自动重试。
 
 ## 验证
 
 ```powershell
+# CLI 后端的流式、会话隔离、错误和清理测试，不访问网络
+node --test .\selection-translator\copilot-bridge.test.mjs
+
 # SSE 分包/UTF-8/取消、输入和定位；也跑受控 WPF 流式界面测试
 # 不调用网络、不操作鼠标，可在锁屏状态运行；会短暂创建测试窗口
 powershell.exe -NoProfile -STA -File .\selection-translator\start.ps1 -Test
