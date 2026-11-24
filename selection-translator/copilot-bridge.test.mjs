@@ -8,6 +8,7 @@ test('isolated CLI session streams only translation and deletes its history', as
     const client = {
         async createSession(config) {
             assert.equal(config.model, 'gpt-6-luna');
+            assert.equal(config.reasoningEffort, 'low');
             assert.deepEqual(config.availableTools, []);
             assert.equal(config.streaming, true);
             assert.equal(config.enableConfigDiscovery, false);

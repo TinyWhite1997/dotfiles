@@ -6,6 +6,7 @@ import { join } from 'node:path';
 export async function translate(client, request, emit) {
     const session = await client.createSession({
         model: request.model,
+        reasoningEffort: 'low',
         availableTools: [],
         streaming: true,
         enableConfigDiscovery: false,
