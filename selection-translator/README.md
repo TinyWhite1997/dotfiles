@@ -1,6 +1,6 @@
 # 划词翻译 · Copilot GPT-6 Luna
 
-Windows 10/11 原生后台小工具：**划选文字 → 附近出现「复制｜翻译」悬浮条 → 左侧复制原文，右侧请求模型并就近显示译文。** 只划选不发送原文。界面使用系统自带的 Windows PowerShell 5.1、WPF 和 Windows Forms；默认后端需要 Node.js、已安装并登录的 Copilot CLI 及其随附 SDK。
+Windows 10/11 原生后台小工具：**划选文字 → 附近出现「复制｜翻译」悬浮条 → 左侧复制原文，右侧请求模型并就近显示译文。** 只划选不发送原文。界面使用系统自带的 Windows PowerShell 5.1、WPF 和 Windows Forms；默认后端通过 HTTP 直连 Copilot Responses API，需要 Node.js 和已安装并登录的 Copilot CLI，仅用其原生模块读取已有登录。
 
 ## 启动与托盘
 
@@ -35,16 +35,19 @@ powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File .\selection-transla
 .\selection-translator\start.ps1 -Model gpt-6.1-sol
 ```
 
-启动脚本自动寻找 `COPILOT_CLI_PATH`、PATH 或 `$HOME\.copilot-cli` 中的 `copilot.exe`，以及 CLI 缓存中的随附 SDK。自定义安装可传入 `-CliPath 'C:\path\copilot.exe' -SdkPath 'C:\path\copilot-sdk\index.js'`。不会修改 CLI 的默认模型、登录文件或全局设置。
+启动脚本从 `COPILOT_CLI_RESOLVED_DIST_DIR` 或本机 CLI 缓存寻找 `prebuilds\win32-*\runtime.node`，自定义安装可传入 `-RuntimePath 'C:\path\runtime.node'`。Node.js 必须与原生模块架构兼容。不会修改 CLI 的默认模型、登录文件或全局设置。
+
+翻译固定使用 `reasoning.effort: low`，复用同一个 `HttpClient` 和连接池。不会逐次启动 Copilot CLI、SDK 或创建聊天会话；首次翻译及凭据缓存失效时才启动短时 Node.js 辅助进程读取登录。
 
 ## 登录与隐私
 
-- 默认通过 CLI 随附 SDK 复用 Copilot CLI 已有登录，不自行读取、复制或保存令牌。每次翻译使用独立会话，关闭工具、技能、记忆、仓库配置发现、文件钩子和跨会话内容存储；不继承当前聊天上下文。
+- 默认仅支持 `github.com` 登录：通过 CLI 原生模块读取当前账号的 OAuth 令牌，经私有进程管道传回主进程，再直接请求固定的 `https://api.githubcopilot.com/responses`，不做旧版 token exchange。令牌只在内存缓存约 10 分钟，不写文件或日志；HTTP 401 会清除缓存，下次点击重新读取，不自动重试。
 - 划选只在本机暂存选中文字，不换取令牌、不调用翻译模型；**点击翻译才联网**。密码控件不读取，请勿主动发送密钥、密码或机密资料。
-- 只发送选中文字，不发送整篇文档。SDK 可能产生临时会话状态，翻译结束会请求删除会话；强制终止或异常退出不保证完成清理。云端数据处理仍以你的 Copilot 方案和组织策略为准。
+- 只发送选中文字和固定翻译指令，不发送整篇文档或当前聊天上下文，不运行工具、技能或文件钩子。请求设置 `store: false`，不创建 CLI 会话；云端数据处理仍以你的 Copilot 方案和组织策略为准。
 - 读取选区时不发送 Ctrl+C、不读取或改写剪贴板。只有明确点击「复制」才写入剪贴板：悬浮条写入原文，译文框写入译文；复制原文不会发起网络请求。
 - 请求可能消耗订阅配额，不自动重试失败请求；新翻译取消旧请求，避免旧译文覆盖新内容。
-- 仍支持显式传入 `-AuthPath "$HOME\.pi\agent\auth.json"` 使用旧 pi token exchange + Responses 后端；只有该模式读取 pi 凭据并设置 `store: false`，不会自动回退到它。该非通用公开接口可能随服务更新失效。
+- 仍支持显式传入 `-AuthPath "$HOME\.pi\agent\auth.json"` 使用旧 pi token exchange + Responses 后端，不会自动回退到它。
+- Copilot API 和 CLI 原生凭据接口不是稳定的通用公开接口，可能随服务或 CLI 更新失效；此时明确显示错误，不静默换账号、换模型或回退。
 
 ## 限制与排查
 
@@ -52,15 +55,15 @@ powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File .\selection-transla
 - 选区读取依赖 UI Automation TextPattern；部分 PDF、终端、游戏、自绘控件无法读取。悬浮条保留原有 8000 字符选区上限，超长原文请在原应用中直接复制，不会静默复制被截断的文本。当前界面不提供原文输入框，也不做 OCR，不会覆盖剪贴板绕过限制。
 - 普通权限下不保证读取管理员权限应用，不自动提权。
 - 位置以鼠标划选结束点为锚点；键盘入口以当前鼠标位置为锚点。原生托盘图标和菜单会遵循 Windows 的显示/折叠规则。
-- 默认直接显示 SDK 的 `assistant.message_delta`；旧 pi 后端使用 Responses API 的 SSE `response.output_text.delta`。只显示译文，不把推理或完成快照重复追加到译文。
+- 直接显示 Responses API 的 SSE `response.output_text.delta`。只显示译文，不把推理或完成快照重复追加到译文。
 - 首段出现仍取决于模型首字延迟和网络；流式可以省去「必须等整段生成结束才能阅读」的等待，不保证立即出字，也不会用打字动画模拟流式。
-- 模型权限、登录过期、限流或网络错误显示在译文框下方，不会悄悄换模型。SDK 翻译等待上限 60 秒，CLI 启动加读取总体上限 90 秒，清理子进程另留最多约 10 秒；旧 pi 后端为整体 60 秒。连接中断时保留并明确标注「部分译文」，仍可复制，不自动重试。
+- 模型权限、登录过期、限流或网络错误显示在译文框下方，不会悄悄换模型。整个请求（包括凭据读取与响应流）上限 60 秒。连接中断时保留并明确标注「部分译文」，仍可复制，不自动重试。
 
 ## 验证
 
 ```powershell
-# CLI 后端的流式、会话隔离、错误和清理测试，不访问网络
-node --test .\selection-translator\copilot-bridge.test.mjs
+# 原生登录读取与账号边界测试，不访问网络或读取真实凭据
+node --test .\selection-translator\copilot-auth.test.mjs
 
 # SSE 分包/UTF-8/取消、输入和定位；也跑受控 WPF 流式界面测试
 # 不调用网络、不操作鼠标，可在锁屏状态运行；会短暂创建测试窗口
